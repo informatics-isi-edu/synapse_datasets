@@ -1,10 +1,17 @@
+import os
+import shutil
+import tempfile
+import pandas as pd
+import csv
+
+
 def get_synapses(synapsefiles, study):
-    '''
+    """
      synapsefile: a HatracStore object
      study: a dictionary that has URLs for the two images, before and after
 
      returns two pandas that have the synapses in them.
-     '''
+     """
 
     try:
         # Get a path for a tempory file to store HATRAC results
@@ -30,10 +37,10 @@ def get_synapses(synapsefiles, study):
     return {'Before': img1, 'After': img2, 'Type': study['Type'], 'Study': study['Study'], 'Subject': study['Subject']}
 
 
-def copy_synapses(study):
-    '''
+def copy_synapses(objectstore, study):
+    """
     Copy the files assoicated with a study into a local directory
-    '''
+    """
 
     for URL in [study['Region 1 URL'], study['Region 2 URL']]:
         try:
@@ -66,21 +73,20 @@ def copy_synapses(study):
             shutil.rmtree(os.path.dirname(tmpfile))
 
 
-def export_synapse_studies(study_list):
-    '''
+def export_synapse_studies(objectstore, study_list):
+    """
     Export all of the synapse data for every study in the study list.
     Also output a CVS file that contains an index of all of the data.
 
     The data indes is: StudyID, SubjectID, Study Type, FileNames for Before and After synapses.
 
-    '''
-
+    """
     # Create an output directory for synapse files.
     os.makedirs('synapse-studies', mode=0o777, exist_ok=True)
     os.chdir('synapse-studies')
 
     for study in study_list:
-        copy_synapses(study)
+        copy_synapses(objectstore, study)
 
     with open('studies.csv', 'w', newline='') as csvfile:
         synapsewriter = csv.writer(csvfile)
@@ -89,68 +95,13 @@ def export_synapse_studies(study_list):
         synapsewriter.writerow(['Study', 'Subject', 'Type', 'Before', 'After'])
         for study in study_list:
 
-            URL1 = study['Region 1 URL']
-            URL2 = study['Region 2 URL']
+            url1 = study['Region 1 URL']
+            url2 = study['Region 2 URL']
 
             filename1 = filename2 = ''
-            if URL1:
-                filename1 = (os.path.basename(URL1.split(':')[0]))
-            if URL2:
-                filename2 = (os.path.basename(URL2.split(':')[0]))
+            if url1:
+                filename1 = (os.path.basename(url1.split(':')[0]))
+            if url2:
+                filename2 = (os.path.basename(url2.split(':')[0]))
 
             synapsewriter.writerow([study['Study'], study['Subject'], study['Type'], filename1, filename2])
-
-# Plot a study
-
-import plotly as py
-import plotly.graph_objs as go
-
-py.offline.init_notebook_mode(connected=True)
-
-def plot_study(study):
-    '''
-    Create a 3D scatter plot of a study.
-    '''
-    trace1 = go.Scatter3d(
-        x=study['Before']['X'],
-        y=study['Before']['Y'],
-        z=study['Before']['Z'],
-        mode='markers',
-        marker=dict(
-            size=2,
-            line=dict(
-            color='rgb(0,255,0)',
-            width=0.5
-            ),
-        opacity=0.8
-        )
-    )
-
-    trace2 = go.Scatter3d(
-        x=study['After']['X'],
-        y=study['After']['Y'],
-        z=study['After']['Z'],
-        mode='markers',
-        marker=dict(
-            size=2,
-            line=dict(
-                color='rgb(255,0,0)',
-                width=.5
-            ),
-        opacity=0.8
-        )
-    )
-
-    data = [trace1, trace2]
-
-    layout = go.Layout(
-        margin=dict(
-            l=0,
-            r=0,
-            b=0,
-            t=0
-        )
-    )
-
-    fig = go.Figure(data=data, layout=layout)
-    py.offline.iplot(fig)
