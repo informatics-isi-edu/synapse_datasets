@@ -42,3 +42,4 @@ print('Identified %d studies' % len(study_entities))
 
 export_files(study_entities, destdir)
 print('Dumped studies')
+
