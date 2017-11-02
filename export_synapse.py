@@ -11,13 +11,17 @@ protocol_types = {
 }
 
 
+bag_metadata = {
+    'External-Description' : 'Synapse Pair Datasets',
+    'EMMRest-Query' : 'This is completely arbitrary'
 
+}
 
 
 destdir = '/Users/carl/Desktop'
 
 
-def export_files(study_entities, dest):
+def export_files(study_entities, dest, bag_metadata = None):
     # Dump out the synapses to a local directory
 
     study_list = []
@@ -32,7 +36,7 @@ def export_files(study_entities, dest):
 
     try:
         os.chdir(dest)
-        synapse_utils.export_synapse_studies(study_list, dest)
+        synapse_utils.export_synapse_studies(study_list, dest, bag_metadata)
     finally:
         os.chdir(current_dir)
 
@@ -40,6 +44,7 @@ def export_files(study_entities, dest):
 study_entities = synapse_utils.get_synapse_studies()
 print('Identified %d studies' % len(study_entities))
 
-export_files(study_entities, destdir)
+bag_metadata['ERMRest-Query'] = study_entities.uri
+export_files(study_entities, destdir, bag_metadata)
 print('Dumped studies')
 

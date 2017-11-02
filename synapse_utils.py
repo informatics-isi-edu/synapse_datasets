@@ -91,7 +91,7 @@ def copy_synapses(objectstore, study):
             shutil.rmtree(os.path.dirname(tmpfile))
 
 
-def export_synapse_studies(study_list, dest):
+def export_synapse_studies(study_list, dest, bag_metadata = None):
     """
     Export all of the synapse data for every study in the study list.
     Also output a CVS file that contains an index of all of the data.
@@ -132,7 +132,7 @@ def export_synapse_studies(study_list, dest):
                     filename2 = (os.path.basename(url2.split(':')[0]))
 
                 synapsewriter.writerow([study['Study'], study['Subject'], study['Type'], filename1, filename2])
-        bdbag.bdbag_api.make_bag(dumpdir)
+        bdbag.bdbag_api.make_bag(dumpdir, metadata = bag_metadata, update=True)
     finally:
         os.chdir(current_dir)
 
