@@ -5,8 +5,14 @@ protocol_types = {
     'PrcDsy20160101A': 'aversion',
     'PrcDsy20170613A': 'conditioned',
     'PrcDsy20170615A': 'unconditioned',
-    'PrcDsy20170613B': 'control'
+    'PrcDsy20170613B': 'fullcycle-control',
+    'PrcDsy20171030A': 'groundtruth-control',
+    'PrcDsy20171030B': 'interval-groundtruth-control'
 }
+
+
+
+
 
 destdir = '/Users/carl/Desktop'
 
