@@ -27,16 +27,15 @@ def get_synapses(study):
     credential = get_credential("synapse.isrd.isi.edu")
     objectstore = HatracStore('https', 'synapse.isrd.isi.edu', credentials=credential)
 
+    # Get a path for a tempory file to store HATRAC results
+    path = os.path.join(tempfile.mkdtemp(), 'image')
     try:
-        # Get a path for a tempory file to store HATRAC results
-        path = os.path.join(tempfile.mkdtemp(), 'image')
-
         # Get the before image from hatrac, be careful in case its missing
         if study['BeforeURL']:
             objectstore.get_obj(study['BeforeURL'], destfilename=path)
             img1 = pd.read_csv(path)
             if True:
-             img1.drop(img1.index[0], inplace=True)
+                img1.drop(img1.index[0], inplace=True)
         else:
             img1 = None
 
@@ -53,9 +52,9 @@ def get_synapses(study):
     return {'Before': img1, 'After': img2, 'Type': study['Type'], 'Study': study['Study'], 'Subject': study['Subject']}
 
 
-def copy_synapses(objectstore, study):
+def copy_synapse_files(objectstore, study):
     """
-    Copy the files assoicated with a study into a local directory
+    Copy the files associated with a study into a local directory
     """
 
     for URL in [study['BeforeURL'], study['AfterURL']]:
@@ -91,7 +90,7 @@ def copy_synapses(objectstore, study):
             shutil.rmtree(os.path.dirname(tmpfile))
 
 
-def export_synapse_studies(study_list, dest, bag_metadata = None):
+def synapses_to_bag(study_list, dest, protocol_types, bag_metadata=None, publish=False):
     """
     Export all of the synapse data for every study in the study list.
     Also output a CVS file that contains an index of all of the data.
@@ -99,6 +98,8 @@ def export_synapse_studies(study_list, dest, bag_metadata = None):
     The data indes is: StudyID, SubjectID, Study Type, FileNames for Before and After synapses.
 
     """
+
+    bag_metadata = bag_metadata if bag_metadata else {}
 
     credential = get_credential("synapse.isrd.isi.edu")
     objectstore = HatracStore('https', 'synapse.isrd.isi.edu', credentials=credential)
@@ -113,15 +114,16 @@ def export_synapse_studies(study_list, dest, bag_metadata = None):
         dumpdir = os.getcwd()
 
         for study in study_list:
-            copy_synapses(objectstore, study)
+            copy_synapse_files(objectstore, study)
 
+        # Now write out the CSV file will the list of studies...
         with open('studies.csv', 'w', newline='') as csvfile:
             synapsewriter = csv.writer(csvfile)
 
             # Write out header....
-            synapsewriter.writerow(['Study', 'Subject', 'Type', 'Before', 'After'])
+            synapsewriter.writerow(['Study', 'Subject', 'Type', 'Learner', 'Before', 'After'])
             for study in study_list:
-
+                study_type = protocol_types[study['Protocol']]
                 url1 = study['BeforeURL']
                 url2 = study['AfterURL']
 
@@ -131,13 +133,27 @@ def export_synapse_studies(study_list, dest, bag_metadata = None):
                 if url2:
                     filename2 = (os.path.basename(url2.split(':')[0]))
 
-                synapsewriter.writerow([study['Study'], study['Subject'], study['Type'], filename1, filename2])
-        bdbag.bdbag_api.make_bag(dumpdir, metadata = bag_metadata, update=True)
+                synapsewriter.writerow([study['Study'], study['Subject'], study_type, study['Learner'],
+                                        filename1, filename2])
+
+        bdbag.bdbag_api.make_bag(dumpdir, metadata=bag_metadata)
+        archivefile = bdbag.bdbag_api.archive_bag(dumpdir, 'zip')
+
+        if publish:
+            bagstore = HatracStore('https', 'synapse-dev.isrd.isi.edu', credentials=credential)
+            hatrac_path = '/hatrac/Data/synapse-{0}'.format(bag_metadata['ERMRest-Snapshot'])
+            return bagstore.put_obj(hatrac_path, archivefile)
     finally:
         os.chdir(current_dir)
+    return archivefile
 
 
-def get_synapse_studies(protocols = None):
+def get_synapse_studies(protocols=None):
+    """
+    Get the current list of synapse studys.
+    :param protocols:
+    :return:
+    """
 
     # Need to use Deriva authentication agent before executing this
     credential = get_credential("synapse.isrd.isi.edu")
@@ -156,12 +172,12 @@ def get_synapse_studies(protocols = None):
     # Build up the path study->pair->behavior.
     # Make aliases for study and pair instances for later use.
     # We use the left join to make sure we get controls, which will be studies without behaviors.
-    path = study_table.alias('study') \
-        .link(pair_table.alias('pair')) \
+    path = study_table.alias('study')\
+        .link(pair_table.alias('pair'))\
         .link(zebrafish.Behavior, join_type='left', on=(pair_table.Subject == zebrafish.Behavior.Subject))
 
-    # We only want pairs that have segmented values
-   # path = path.filter( ((path.study.columns['Region 1 URL'] == '') | (path.study.columns['Region 2 URL'] == '')))
+    # We only want pairs that have segmented values, so check to make sure both URLs are there
+    path = path.filter( ~((path.study.columns['Region 1 URL'] == '') | (path.study.columns['Region 2 URL'] == '')))
 
     # Now lets go back an pick up the protocols which are associated with an image.
     # Each image has a protocol step, and from the step we can get the protocol.
