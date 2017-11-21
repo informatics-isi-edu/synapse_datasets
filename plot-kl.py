@@ -17,7 +17,7 @@ def plot_divergence(synapses):
     '''
     Create a 3D scatter plot of a study.
     '''
-    synapses = go.Scatter3d(
+    plot = go.Scatter3d(
         x=synapses['X'],
         y=synapses['Y'],
         z=synapses['Z'],
@@ -27,7 +27,7 @@ def plot_divergence(synapses):
             line=dict(
                 color= synapses['pointwise_kl_divergence'],
                 colorscale = 'Viridis',
-                showscale = True,
+#                showscale = True,
                 width=0.5
             ),
         opacity=0.8
