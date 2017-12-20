@@ -193,6 +193,8 @@ def get_synapse_studies(protocols=None):
     # Now that we have build up the path, we can retrieve the set of studies and associated values
     study_entities = path.study.entities(Study=path.study.ID,
                                          Subject=path.pair.Subject,
+                                         Region1=path.study.columns['Synaptic Region 1'],
+                                         Region2=path.study.columns['Synaptic Region 2'],
                                          BeforeURL=path.study.columns['Region 1 URL'],
                                          AfterURL=path.study.columns['Region 2 URL'],
                                          Learner=path.Behavior.columns['Learned?'],
