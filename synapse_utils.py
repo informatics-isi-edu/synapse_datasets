@@ -197,6 +197,8 @@ def get_synapse_studies(protocols=None):
                                          Region2=path.study.columns['Synaptic Region 2'],
                                          BeforeURL=path.study.columns['Region 1 URL'],
                                          AfterURL=path.study.columns['Region 2 URL'],
+                                         BeforeImageID=path.pair.columns['Image 1'],
+                                         AfterImageID=path.pair.columns['Image 2'],
                                          Learner=path.Behavior.columns['Learned?'],
                                          Protocol=path.Protocol.ID, )
 
