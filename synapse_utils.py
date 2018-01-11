@@ -182,7 +182,7 @@ def get_synapse_studies(protocols=None):
     # Now lets go back an pick up the protocols which are associated with an image.
     # Each image has a protocol step, and from the step we can get the protocol.
     # Use the first image.
-    path = path.pair.link(zebrafish.Image, on=path.pair.columns['Image 1'] == zebrafish.Image.ID) \
+    path = path.pair.link(zebrafish.Image.alias('image'), on=path.pair.columns['Image 1'] == zebrafish.Image.ID) \
         .link(synapse.tables['Protocol Step']) \
         .link(synapse.Protocol)
 
@@ -200,6 +200,9 @@ def get_synapse_studies(protocols=None):
                                          BeforeImageID=path.pair.columns['Image 1'],
                                          AfterImageID=path.pair.columns['Image 2'],
                                          Learner=path.Behavior.columns['Learned?'],
-                                         Protocol=path.Protocol.ID, )
+                                         AlignP0=path.image.columns['Align P0 ZYX'],
+                                         AlignP1=path.image.columns['Align P1 ZYX'],
+                                         AlignP2=path.image.columns['Align P2 ZYX'],
+                                         Protocol=path.Protocol.ID )
 
     return study_entities
