@@ -4,6 +4,9 @@ import pickle
 import pandas as pd
 import numpy as np
 
+import os
+import subprocess
+
 import synapse_utils
 from synspy.analyze.pair import SynapticPairStudy, ImageGrossAlignment, transform_points
 
@@ -11,10 +14,12 @@ from deriva.core import HatracStore, ErmrestCatalog, get_credential
 
 def get_studies() :
 
-
     credential = get_credential("synapse.isrd.isi.edu")
     ermrest_catalog = ErmrestCatalog('https', 'synapse.isrd.isi.edu', 1, credential)
     hatrac_store = HatracStore('https', 'synapse.isrd.isi.edu', credentials=credential)
+
+    githash = git_version()
+    ermrest_snapshot = catalog_snapshot()
 
 # Get the current list of studies from the server.
     study_entities = synapse_utils.get_synapse_studies()
@@ -43,6 +48,7 @@ def get_studies() :
 
         try:
             i['Aligned'] = False
+            i['Provenence'] = { 'GITHash': githash , 'CatlogVersion': ermrest_snapshot}
             i['Alignment'] = ImageGrossAlignment.from_image_id(ermrest_catalog, i['BeforeImageID'])
             p = pd.DataFrame([i[pt] for pt in ['AlignP0', 'AlignP1', 'AlignP2']])
             p =  p.multiply(pd.DataFrame([{'z': 0.4, 'y': 0.26, 'x': 0.26}]*3))
@@ -156,3 +162,36 @@ def restore_studies(fname):
 
     print('Restored {0} studies'.format(len(slist)))
     return slist
+
+# Return the git revision as a string
+def git_version():
+    def _minimal_ext_cmd(cmd):
+        # construct minimal environment
+        env = {}
+        for k in ['SYSTEMROOT', 'PATH']:
+            v = os.environ.get(k)
+            if v is not None:
+                env[k] = v
+        # LANGUAGE is used on win32
+        env['LANGUAGE'] = 'C'
+        env['LANG'] = 'C'
+        env['LC_ALL'] = 'C'
+        out = subprocess.Popen(cmd, stdout = subprocess.PIPE, env=env).communicate()[0]
+        return out
+
+    try:
+        out = _minimal_ext_cmd(['git', 'rev-parse', 'HEAD'])
+        GIT_REVISION = out.strip().decode('ascii')
+    except OSError:
+        GIT_REVISION = "Unknown"
+
+    return GIT_REVISION
+
+
+def catalog_snapshot():
+        credential = get_credential("synapse.isrd.isi.edu")
+        catalog = ErmrestCatalog('https', 'synapse.isrd.isi.edu', 1, credential)
+        # Get current version of catalog and construct a new URL that fully qualifies catalog with version.
+        version = catalog.get('/').json()['snaptime']
+        return version
+
