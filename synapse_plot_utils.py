@@ -52,9 +52,10 @@ def get_studies() :
             i['Alignment'] = ImageGrossAlignment.from_image_id(ermrest_catalog, i['BeforeImageID'])
             p = pd.DataFrame([i[pt] for pt in ['AlignP0', 'AlignP1', 'AlignP2']])
             p =  p.multiply(pd.DataFrame([{'z': 0.4, 'y': 0.26, 'x': 0.26}]*3))
-            i['AlignmentPts'] = pd.DataFrame(transform_points(i['Alignment'].M, p.loc[:,['x','y','z']]),
+            i['StudyAlignmentPts'] = pd.DataFrame(transform_points(i['Alignment'].M, p.loc[:,['x','y','z']]),
                                                  columns=['x', 'y', 'z'])
             i['Aligned'] = True
+            i['AlignmentPts'] = dict()
         except ValueError:  # Alignments missing....
             continue
         except NotImplementedError:
@@ -138,6 +139,7 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
             # Now compute the aligned images, if you have the tranformation matrix available.
             if s['Aligned']:
                 image_obj = s['Alignment']
+                s['AlignmentPts'][r] = s['StudyAlignmentPts']
                 for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter']:
                     p = pd.DataFrame(transform_points(image_obj.M, s[ptype][r].loc[:, ['x', 'y', 'z']]),
                                      columns=['x', 'y', 'z'])
@@ -148,7 +150,6 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
 
                     s[p.DataType] = s.get(p.DataType, dict())
                     s[p.DataType][r] = p
-
 
 def dump_studies(slist, fname):
     with open(fname, 'wb') as fo:
