@@ -113,43 +113,70 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
 
             p = pd.DataFrame(unpaired1[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
             s['UnpairedBefore'] = s.get('UnpairedBefore', dict())
-            s['UnpairedBefore'][r] = p
+            s['UnpairedBefore'][r] = { 'Data' : p }
 
             p = pd.DataFrame(unpaired2[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
             s['UnpairedAfter'] = s.get('UnpairedAfter', dict())
-            s['UnpairedAfter'][r] = p
+            s['UnpairedAfter'][r] = { 'Data' : p }
 
             p = pd.DataFrame(paired1[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
             s['PairedBefore'] = s.get('PairedBefore', dict())
-            s['PairedBefore'][r] = p
+            s['PairedBefore'][r] = { 'Data' : p }
 
             p = pd.DataFrame(paired2[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
             s['PairedAfter'] = s.get('PairedAfter', dict())
-            s['PairedAfter'][r] = p
+            s['PairedAfter'][r] = { 'Data' : p }
 
-            # Fill in other useful values into the pandas so you can use them without having the
-            # study handy
+            # Fill in other useful values so you can use them without having the study handy
             for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter']:
                 p = s[ptype][r]
-                p.DataType = ptype
-                p.Study = s['Study']
-                p.Radius = r
-                p.Type = s['Type']
+                p['DataType'] = ptype
+                p['Study'] = s['Study']
+                p['Radius'] = r
+                p['Type'] = s['Type']
+
+            # now compute the centroids and store as pandas.
+            for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter'] :
+                p = s[ptype][r]['Data']
+                centroid = tuple([p['x'].mean(), p['y'].mean(), p['z'].mean()])
+                pc = pd.DataFrame.from_records([centroid], columns=['x', 'y', 'z'])
+                cname = ptype + 'Centroid'
+                s[cname] = s.get(cname, dict())
+                s[cname][r] = {'Data': pc}
+                p = s[cname][r]
+                p['DataType'] = cname
+                p['Study'] = s['Study']
+                p['Radius'] = r
+                p['Type'] = s['Type']
 
             # Now compute the aligned images, if you have the tranformation matrix available.
             if s['Aligned']:
                 image_obj = s['Alignment']
-                s['AlignmentPts'][r] = s['StudyAlignmentPts']
+                s['AlignmentPts'][r] = { 'Data' : s['StudyAlignmentPts'] }
                 for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter']:
-                    p = pd.DataFrame(transform_points(image_obj.M, s[ptype][r].loc[:, ['x', 'y', 'z']]),
+                    p = pd.DataFrame(transform_points(image_obj.M, s[ptype][r]['Data'].loc[:, ['x', 'y', 'z']]),
                                      columns=['x', 'y', 'z'])
-                    p['core'] = s[ptype][r]['core']
-                    p.DataType = 'Aligned' + ptype
-                    p.Study = s[ptype][r].Study
-                    p.Radius = r
+                    p['core'] = s[ptype][r]['Data']['core']
 
-                    s[p.DataType] = s.get(p.DataType, dict())
-                    s[p.DataType][r] = p
+                    # Now do th aligned ....
+                    datatype = 'Aligned' + ptype
+                    s[datatype] = s.get(datatype, dict())
+                    s[datatype][r] = {'Data': p}
+                    s[datatype][r]['DataType'] = datatype
+                    s[datatype][r]['Study'] = s['Study']
+                    s[datatype][r]['Radius'] = r
+                    s[datatype][r]['Type'] = s['Type']
+
+                     # now compute the aligned centroids and store as pandas.
+                    centroid = tuple([p['x'].mean(), p['y'].mean(), p['z'].mean()])
+                    pc = pd.DataFrame.from_records([centroid], columns=['x', 'y', 'z'])
+                    cname = datatype + 'Centroid'
+                    s[cname] = s.get(cname, dict())
+                    s[cname][r] = {'Data': pc}
+                    s[cname]['DataType'] = cname
+                    s[cname]['Study'] = s['Study']
+                    s[cname]['Radius'] = r
+                    s[cname]['Type'] = s['Type']
 
 def dump_studies(slist, fname):
     with open(fname, 'wb') as fo:
