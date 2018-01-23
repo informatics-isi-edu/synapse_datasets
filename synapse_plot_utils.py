@@ -28,8 +28,8 @@ def get_studies() :
 
     protocol_types = {
         'PrcDsy20160101A': 'aversion',
-        'PrcDsy20170613A': 'conditioned',
-        'PrcDsy20170615A': 'unconditioned',
+        'PrcDsy20170613A': 'conditioned-control',
+        'PrcDsy20170615A': 'unconditioned-control',
         'PrcDsy20170613B': 'fullcycle-control',
         'PrcDsy20171030A': 'groundtruth-control',
         'PrcDsy20171030B': 'interval-groundtruth-control'
@@ -44,7 +44,8 @@ def get_studies() :
             else:
                 i['Type'] = 'nonlearner'
         else:
-            i['Type'] = protocol_types[i['Protocol']]
+#            i['Type'] = protocol_types[i['Protocol']]
+            i['Type'] = 'control'
 
         try:
             i['Aligned'] = False
