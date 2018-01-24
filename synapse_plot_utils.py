@@ -72,6 +72,7 @@ pair_types = ['PairedBefore', 'PairedAfter',
               'AlignedPairedBefore', 'AlignedPairedAfter',
               'AlignedUnpairedBefore', 'AlignedUnpairedAfter']
 
+
 def group_studies(studies, group='Type'):
     '''
     Return a dictionary whose key it a type, subject, or alignment and whose value is a list of studies'''
@@ -79,7 +80,7 @@ def group_studies(studies, group='Type'):
         key = 'Type'
     if group == 'Subject':
         key = 'Subject'
-    if group =='Aligned':
+    if group == 'Aligned':
         key = 'Aligned'
     g = dict()
     for i in studies:
@@ -114,19 +115,19 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
 
             p = pd.DataFrame(unpaired1[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
             s['UnpairedBefore'] = s.get('UnpairedBefore', dict())
-            s['UnpairedBefore'][r] = { 'Data' : p }
+            s['UnpairedBefore'][r] = {'Data': p}
 
             p = pd.DataFrame(unpaired2[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
             s['UnpairedAfter'] = s.get('UnpairedAfter', dict())
-            s['UnpairedAfter'][r] = { 'Data' : p }
+            s['UnpairedAfter'][r] = {'Data': p}
 
             p = pd.DataFrame(paired1[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
             s['PairedBefore'] = s.get('PairedBefore', dict())
-            s['PairedBefore'][r] = { 'Data' : p }
+            s['PairedBefore'][r] = {'Data': p}
 
             p = pd.DataFrame(paired2[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
             s['PairedAfter'] = s.get('PairedAfter', dict())
-            s['PairedAfter'][r] = { 'Data' : p }
+            s['PairedAfter'][r] = {'Data': p}
 
             # Fill in other useful values so you can use them without having the study handy
             for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter']:
@@ -137,7 +138,7 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
                 p['Type'] = s['Type']
 
             # now compute the centroids and store as pandas.
-            for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter'] :
+            for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter']:
                 p = s[ptype][r]['Data']
                 centroid = tuple([p['x'].mean(), p['y'].mean(), p['z'].mean()])
                 pc = pd.DataFrame.from_records([centroid], columns=['x', 'y', 'z'])
@@ -153,7 +154,7 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
             # Now compute the aligned images, if you have the tranformation matrix available.
             if s['Aligned']:
                 image_obj = s['Alignment']
-                s['AlignmentPts'][r] = { 'Data' : s['StudyAlignmentPts'] }
+                s['AlignmentPts'][r] = {'Data': s['StudyAlignmentPts']}
                 for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter']:
                     p = pd.DataFrame(transform_points(image_obj.M, s[ptype][r]['Data'].loc[:, ['x', 'y', 'z']]),
                                      columns=['x', 'y', 'z'])
@@ -168,7 +169,7 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
                     s[datatype][r]['Radius'] = r
                     s[datatype][r]['Type'] = s['Type']
 
-                     # now compute the aligned centroids and store as pandas.
+                    # now compute the aligned centroids and store as pandas.
                     centroid = tuple([p['x'].mean(), p['y'].mean(), p['z'].mean()])
                     pc = pd.DataFrame.from_records([centroid], columns=['x', 'y', 'z'])
                     cname = datatype + 'Centroid'
@@ -178,6 +179,45 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
                     s[cname]['Study'] = s['Study']
                     s[cname]['Radius'] = r
                     s[cname]['Type'] = s['Type']
+
+
+def aggregate_pairs(studylist, tracelist):
+    r = min(studylist[0][tracelist[0]])
+
+    synapses = {}
+    synapses['all'] = {'all': pd.DataFrame(columns=['x', 'y', 'z']),
+                       'before': pd.DataFrame(columns=['x', 'y', 'z']),
+                       'after': pd.DataFrame(columns=['x', 'y', 'z'])}
+
+    synapses['learner'] = {'all': pd.DataFrame(columns=['x', 'y', 'z']),
+                           'before': pd.DataFrame(columns=['x', 'y', 'z']),
+                           'after': pd.DataFrame(columns=['x', 'y', 'z'])}
+
+    synapses['nonlearner'] = {'all': pd.DataFrame(columns=['x', 'y', 'z']),
+                              'before': pd.DataFrame(columns=['x', 'y', 'z']),
+                              'after': pd.DataFrame(columns=['x', 'y', 'z'])}
+
+    synapses['control'] = {'all': pd.DataFrame(columns=['x', 'y', 'z']),
+                           'before': pd.DataFrame(columns=['x', 'y', 'z']),
+                           'after': pd.DataFrame(columns=['x', 'y', 'z'])}
+
+    for s in studylist:
+        before = s['AlignedUnpairedBefore'][r]['Data']
+        after = s['AlignedUnpairedAfter'][r]['Data']
+
+        synapses['all']['before'] = synapses['all']['before'].append(before, ignore_index=True)
+        synapses['all']['after'] = synapses['all']['after'].append(after, ignore_index=True)
+        if s['Type'] == 'learner':
+            synapses['learner']['before'] = synapses['learner']['before'].append(before, ignore_index=True)
+            synapses['learner']['after'] = synapses['learner']['after'].append(after, ignore_index=True)
+        elif s['Type'] == 'nonlearner':
+            synapses['nonlearner']['before'] = synapses['nonlearner']['before'].append(before, ignore_index=True)
+            synapses['nonlearner']['after'] = synapses['nonlearner']['after'].append(after, ignore_index=True)
+        else:
+            synapses['control']['before'] = synapses['control']['before'].append(before, ignore_index=True)
+            synapses['control']['after'] = synapses['control']['after'].append(after, ignore_index=True)
+    return synapses
+
 
 def dump_studies(slist, fname):
     with open(fname, 'wb') as fo:
@@ -191,6 +231,7 @@ def restore_studies(fname):
 
     print('Restored {0} studies'.format(len(slist)))
     return slist
+
 
 # Return the git revision as a string
 def git_version():

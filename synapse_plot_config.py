@@ -162,7 +162,7 @@ def trace_masks(study_map, trace_map, type_map):
     return {'trace': trace, 'study': study, 'studyset': studyset}
 
 
-def step_buttons(plotmode, masks, step= None):
+def step_buttons(plotmode, masks, step=None, showlegend=True, skipall=False):
     button_list = []
     plotmode = plotmode.lower()
 
@@ -175,6 +175,8 @@ def step_buttons(plotmode, masks, step= None):
         button_list.append(dict(args=[{'visible': masks['study'][step]['after']}], label='After', method='restyle'))
     else:  # studyset
         for i, l in [('all', ''), ('learner', 'L-'), ('nonlearner', 'N-'), ('control', 'C-')]:
+            if skipall and i == 'all':
+                continue
             button_list.append(dict(args=[{'visible': masks['studyset'][i]['all']}], label=l + 'All', method='restyle'))
             button_list.append(dict(args=[{'visible': masks['studyset'][i]['before']}], label=l + 'Before', method='restyle'))
             button_list.append(dict(args=[{'visible': masks['studyset'][i]['after']}], label=l + 'After', method='restyle'))
@@ -189,12 +191,16 @@ def step_buttons(plotmode, masks, step= None):
             x=0,
             y=1.05,
             yanchor='top'
-        ),
-        dict(
-             buttons=list([
-                dict(args=[{'showlegend': True}], label='Legend on', method='relayout'),
-                dict(args=[{'showlegend': False}], label='Legend off', method='relayout')
-             ]),
+        )]
+    )
+
+    if showlegend:
+        updatemenus.append(
+            dict(
+                buttons=list([
+                    dict(args=[{'showlegend': True}], label='Legend on', method='relayout'),
+                    dict(args=[{'showlegend': False}], label='Legend off', method='relayout')
+                ]),
             direction='left',
             showactive=True,
             type='buttons',
@@ -202,8 +208,8 @@ def step_buttons(plotmode, masks, step= None):
             y=1.1,
             x=0,
             yanchor='top'
-        ),
-    ])
+            )
+        )
 
     return updatemenus
 
