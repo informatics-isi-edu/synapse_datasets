@@ -95,11 +95,12 @@ def position_layout(minx, miny, minz, maxx, maxy, maxz):
                        range=[miny, maxy],
                        color='green'),
             zaxis=dict(title='Z Axis',
-                       range=[minz, maxz],
+                      range=[minz, maxz],autorange='reversed',
                        color='blue', ),
 
+            camera=dict(up=dict(x=0, y=0, z=-1)),
             aspectmode='cube',
-            dragmode='turntable',
+        #    dragmode='turntable',
             annotations=position_annotations(minx, miny, minz, maxx, maxy, maxz)
         )
     )
@@ -170,16 +171,18 @@ def step_buttons(plotmode, masks, step=None, showlegend=True, skipall=False):
         for i, l in [('all', 'All'), ('learner', 'Learner'), ('nonlearner', 'Nonlearner'), ('control', 'Control')]:
             button_list.append(dict(args=[{'visible': masks['trace'][step][i]}], label=l, method='restyle'))
     elif plotmode == 'study':
-        button_list.append(dict(args=[{'visible': masks['study'][step]['all']}], label='All', method='restyle'))
-        button_list.append(dict(args=[{'visible': masks['study'][step]['before']}], label='Before', method='restyle'))
-        button_list.append(dict(args=[{'visible': masks['study'][step]['after']}], label='After', method='restyle'))
+        button_list.append(dict(args=[{'visible': masks['study'][step]['all']}], label='All', method='update'))
+        button_list.append(dict(args=[{'visible': masks['study'][step]['before']}], label='Before', method='update'))
+        button_list.append(dict(args=[{'visible': masks['study'][step]['after']}], label='After', method='update'))
     else:  # studyset
         for i, l in [('all', ''), ('learner', 'L-'), ('nonlearner', 'N-'), ('control', 'C-')]:
             if skipall and i == 'all':
                 continue
             button_list.append(dict(args=[{'visible': masks['studyset'][i]['all']}], label=l + 'All', method='restyle'))
-            button_list.append(dict(args=[{'visible': masks['studyset'][i]['before']}], label=l + 'Before', method='restyle'))
-            button_list.append(dict(args=[{'visible': masks['studyset'][i]['after']}], label=l + 'After', method='restyle'))
+            button_list.append(
+                dict(args=[{'visible': masks['studyset'][i]['before']}], label=l + 'Before', method='restyle'))
+            button_list.append(
+                dict(args=[{'visible': masks['studyset'][i]['after']}], label=l + 'After', method='restyle'))
 
     updatemenus = list([
         dict(
@@ -198,16 +201,16 @@ def step_buttons(plotmode, masks, step=None, showlegend=True, skipall=False):
         updatemenus.append(
             dict(
                 buttons=list([
-                    dict(args=[{'showlegend': True}], label='Legend on', method='relayout'),
-                    dict(args=[{'showlegend': False}], label='Legend off', method='relayout')
+                    dict(args=[{'showlegend': True}], label='Legend on', method='update'),
+                    dict(args=[{'showlegend': False}], label='Legend off', method='update')
                 ]),
-            direction='left',
-            showactive=True,
-            type='buttons',
-            xanchor='left',
-            y=1.1,
-            x=0,
-            yanchor='top'
+                direction='left',
+                showactive=True,
+                type='buttons',
+                xanchor='left',
+                y=1.1,
+                x=0,
+                yanchor='top'
             )
         )
 
