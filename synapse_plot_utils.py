@@ -3,6 +3,7 @@ import pickle
 
 import pandas as pd
 import numpy as np
+import xarray as xr
 from math import floor, ceil
 
 import os
@@ -241,9 +242,19 @@ def synapse_density(synapses, nbins=10, plane=None):
                       include_lowest=True)
 
     # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
-    density = synapses['x'].groupby([bins[plane[0]], bins[plane[1]]]).count().reset_index(name='count')
-    density['density'] = density['count']/len(synapses)
-    return density
+#    density = synapses['x'].groupby([bins[plane[0]], bins[plane[1]]]).count().reset_index(name='count')
+#    density['density'] = density['count']/len(synapses)
+
+    counts = synapses.groupby([bins[plane[0]], bins[plane[1]]]).size()
+
+    # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
+    # fill in the NaN that result from empty bins with 0.
+    ds = xr.Dataset({'counts': counts}).unstack('dim_0').fillna(0)
+
+    # Now add another array for density.
+    ds['density'] = ds['counts'] / ds['counts'].sum()
+
+    return ds
 
 
 def dump_studies(slist, fname):
