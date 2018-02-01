@@ -203,9 +203,14 @@ def aggregate_pairs(studylist, tracelist):
                            'before': pd.DataFrame(columns=['x', 'y', 'z']),
                            'after': pd.DataFrame(columns=['x', 'y', 'z'])}
 
+    max_before, min_before = (-float('inf'), -float('inf'), -float('inf')),(float('inf'), float('inf'), float('inf'))
+    max_after, min_after = (-float('inf'), -float('inf'), -float('inf')), (float('inf'), float('inf'), float('inf'))
     for s in studylist:
         before = s['AlignedUnpairedBefore'][r]['Data']
         after = s['AlignedUnpairedAfter'][r]['Data']
+
+        max_before, min_before = max(max_before, before.max()), min(min_before, before.min())
+        max_after, min_after = max(max_after, after.max()), min(min_after, after.min())
 
         synapses['all']['before'] = synapses['all']['before'].append(before, ignore_index=True)
         synapses['all']['after'] = synapses['all']['after'].append(after, ignore_index=True)
@@ -218,6 +223,7 @@ def aggregate_pairs(studylist, tracelist):
         else:
             synapses['control']['before'] = synapses['control']['before'].append(before, ignore_index=True)
             synapses['control']['after'] = synapses['control']['after'].append(after, ignore_index=True)
+
     return synapses
 
 
