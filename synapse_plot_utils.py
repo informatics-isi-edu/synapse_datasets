@@ -218,27 +218,28 @@ def aggregate_pairs(studylist, tracelist):
         else:
             synapses['control']['before'] = synapses['control']['before'].append(before, ignore_index=True)
             synapses['control']['after'] = synapses['control']['after'].append(after, ignore_index=True)
+
     return synapses
 
 
-def synapse_density(synapses, nbins=10, plane=None):
+def synapse_density(synapses, smax, smin, nbins=10, plane=None):
 
     # Set the plane that we want to calculate density over.
     if not plane:
         plane = ['x', 'z']
 
     # Find the smallest range in x, y and z so we can figure out the bin sizes by dividing by the number of bins
-    binsize = (synapses[['x', 'y', 'z']].max() - synapses[['x', 'y', 'z']].min()).min() / nbins
+    binsize = min([smax[i]-smin[i] for i in range(3)])/ nbins
 
     bins = {}
-    for c in ['x', 'y', 'z']:
+    for idx,c in enumerate(['x', 'y', 'z']):
         # The number of bins will be determined by the range on the access and the binsize
-        nbins = ceil((synapses[c].max() - synapses[c].min()) / binsize)
+        nbins = ceil((smax[idx] - smin[idx]) / binsize)
 
         # Now create an index that maps the coordinates into the bins
         bins[c] = pd.cut(synapses[c],
-                      [synapses[c].min() + i * binsize for i in range(nbins + 1)],
-                      labels=[synapses[c].min() + i * binsize for i in range(nbins)],
+                      [smin[idx] + i * binsize for i in range(nbins + 1)],
+                      labels=[smin[idx] + i * binsize for i in range(nbins)],
                       include_lowest=True)
 
     # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
