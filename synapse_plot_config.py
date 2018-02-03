@@ -98,7 +98,7 @@ def position_layout(minx, miny, minz, maxx, maxy, maxz):
                       range=[minz, maxz],autorange='reversed',
                        color='blue', ),
 
-            camera=dict(up=dict(x=0, y=0, z=-1)),
+            camera=dict(up=dict(x=0, y=0, z=1)),
             aspectmode='cube',
         #    dragmode='turntable',
             annotations=position_annotations(minx, miny, minz, maxx, maxy, maxz)
