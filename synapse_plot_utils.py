@@ -14,7 +14,7 @@ from synspy.analyze.pair import SynapticPairStudy, ImageGrossAlignment, transfor
 
 from deriva.core import HatracStore, ErmrestCatalog, get_credential
 
-def get_studies() :
+def get_studies():
 
     credential = get_credential("synapse.isrd.isi.edu")
     ermrest_catalog = ErmrestCatalog('https', 'synapse.isrd.isi.edu', 1, credential)
@@ -46,8 +46,7 @@ def get_studies() :
             else:
                 i['Type'] = 'nonlearner'
         else:
-#            i['Type'] = protocol_types[i['Protocol']]
-            i['Type'] = 'control'
+            i['Type'] = protocol_types[i['Protocol']]
 
         try:
             i['Aligned'] = False
@@ -74,7 +73,6 @@ pair_types = ['PairedBefore', 'PairedAfter',
               'AlignedPairedBefore', 'AlignedPairedAfter',
               'AlignedUnpairedBefore', 'AlignedUnpairedAfter']
 
-
 def group_studies(studies, group='Type'):
     '''
     Return a dictionary whose key it a type, subject, or alignment and whose value is a list of studies'''
@@ -86,7 +84,7 @@ def group_studies(studies, group='Type'):
         key = 'Aligned'
     g = dict()
     for i in studies:
-        g[i[key]] = g.get(i[key],[]) + [i]
+        g[i[key]] = g.get(i[key], []) + [i]
     return g
 
 
@@ -184,6 +182,12 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
 
 
 def aggregate_pairs(studylist, tracelist):
+    '''
+    Go through the list of studies and agregate all of the synapes into a single list.
+    :param studylist:
+    :param tracelist:
+    :return:
+    '''
     r = min(studylist[0][tracelist[0]])
 
     synapses = {}
@@ -199,25 +203,19 @@ def aggregate_pairs(studylist, tracelist):
                               'before': pd.DataFrame(columns=['x', 'y', 'z']),
                               'after': pd.DataFrame(columns=['x', 'y', 'z'])}
 
-    synapses['control'] = {'all': pd.DataFrame(columns=['x', 'y', 'z']),
+    for i in ['conditioned-control', 'unconditioned-control',
+              'fullcycle-control', 'groundtruth-control', 'interval-groundtruth-control']:
+        synapses[i] = {'all': pd.DataFrame(columns=['x', 'y', 'z']),
                            'before': pd.DataFrame(columns=['x', 'y', 'z']),
                            'after': pd.DataFrame(columns=['x', 'y', 'z'])}
-
     for s in studylist:
         before = s['AlignedUnpairedBefore'][r]['Data']
         after = s['AlignedUnpairedAfter'][r]['Data']
 
         synapses['all']['before'] = synapses['all']['before'].append(before, ignore_index=True)
         synapses['all']['after'] = synapses['all']['after'].append(after, ignore_index=True)
-        if s['Type'] == 'learner':
-            synapses['learner']['before'] = synapses['learner']['before'].append(before, ignore_index=True)
-            synapses['learner']['after'] = synapses['learner']['after'].append(after, ignore_index=True)
-        elif s['Type'] == 'nonlearner':
-            synapses['nonlearner']['before'] = synapses['nonlearner']['before'].append(before, ignore_index=True)
-            synapses['nonlearner']['after'] = synapses['nonlearner']['after'].append(after, ignore_index=True)
-        else:
-            synapses['control']['before'] = synapses['control']['before'].append(before, ignore_index=True)
-            synapses['control']['after'] = synapses['control']['after'].append(after, ignore_index=True)
+        synapses[s['Type']]['before'] = synapses[s['Type']]['before'].append(before, ignore_index=True)
+        synapses[s['Type']]['after'] = synapses[s['Type']]['after'].append(after, ignore_index=True)
 
     return synapses
 
@@ -229,17 +227,17 @@ def synapse_density(synapses, smax, smin, nbins=10, plane=None):
         plane = ['x', 'z']
 
     # Find the smallest range in x, y and z so we can figure out the bin sizes by dividing by the number of bins
-    binsize = min([smax[i]-smin[i] for i in range(3)])/ nbins
+    binsize = min([smax[i] - smin[i] for i in range(3)]) / nbins
 
     bins = {}
-    for idx,c in enumerate(['x', 'y', 'z']):
+    for idx, c in enumerate(['x', 'y', 'z']):
         # The number of bins will be determined by the range on the access and the binsize
         nbins = ceil((smax[idx] - smin[idx]) / binsize)
 
         # Now create an index that maps the coordinates into the bins
         bins[c] = pd.cut(synapses[c],
                       [smin[idx] + i * binsize for i in range(nbins + 1)],
-                      labels=[smin[idx] + i * binsize for i in range(nbins)],
+                         labels=[smin[idx] + i * binsize for i in range(nbins)],
                       include_lowest=True)
 
     # Compute the number of synapses in the binned plane by grouping in the axis and counting them.

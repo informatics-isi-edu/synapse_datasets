@@ -119,24 +119,22 @@ def trace_masks(study_map, trace_map, type_map):
             trace_cnt = max(trace_cnt, idx)
     trace_cnt = trace_cnt + 1
 
-    for i in ['all', 'learner', 'nonlearner', 'control']:
+    study_types = set([v for k, v in type_map.items()])
+    study_types.add('all')
+
+    for i in study_types:
         studyset[i] = {j: [False] * trace_cnt for j in ['all', 'before', 'after']}
 
     # create mask for each trace
 
     for t, v in trace_map.items():
         trace[t] = {}
-        for i in ['all', 'learner', 'nonlearner', 'control']:
+        for i in study_types:
             trace[t][i] = [False] * trace_cnt
 
         for s, idx in v.items():
             trace[t]['all'][idx] = True
-            if type_map[s] == 'learner':
-                trace[t]['learner'][idx] = True
-            elif type_map[s] == 'nonlearner':
-                trace[t]['nonlearner'][idx] = True
-            elif type_map[s] == 'control':
-                trace[t]['control'][idx] = True
+            trace[t][type_map[s]][idx] = True
 
     # Create masks for each study.
 
@@ -144,38 +142,42 @@ def trace_masks(study_map, trace_map, type_map):
         study[s] = {i: [False] * trace_cnt for i in ['all', 'before', 'after']}
         for t, idx in v.items():
             study[s]['all'][idx] = True
-            for i in ['all', 'learner', 'nonlearner', 'control']:
+            for i in study_types:
                 studyset[i]['all'][idx] = True
 
             if 'Before' in t:
                 study[s]['before'][idx] = True
                 studyset['all']['before'][idx] = True
-                for i in ['learner', 'nonlearner', 'control']:
+                for i in study_types:
                     if type_map[s] == i:
                         studyset[i]['before'][idx] = True
             elif 'After' in t:
                 study[s]['after'][idx] = True
                 studyset['all']['after'][idx] = True
-                for i in ['learner', 'nonlearner', 'control']:
+                for i in study_types:
                     if type_map[s] == i:
                         studyset[i]['after'][idx] = True
 
     return {'trace': trace, 'study': study, 'studyset': studyset}
 
 
-def step_buttons(plotmode, masks, step=None, showlegend=True, skipall=False):
+def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipall=False, ):
     button_list = []
     plotmode = plotmode.lower()
+    print(study_types)
+    study_types.append('all')
 
     if plotmode == 'trace':
-        for i, l in [('all', 'All'), ('learner', 'Learner'), ('nonlearner', 'Nonlearner'), ('control', 'Control')]:
+        for i in study_types:
+            l = i.capitalize()
             button_list.append(dict(args=[{'visible': masks['trace'][step][i]}], label=l, method='restyle'))
     elif plotmode == 'study':
         button_list.append(dict(args=[{'visible': masks['study'][step]['all']}], label='All', method='update'))
         button_list.append(dict(args=[{'visible': masks['study'][step]['before']}], label='Before', method='update'))
         button_list.append(dict(args=[{'visible': masks['study'][step]['after']}], label='After', method='update'))
     else:  # studyset
-        for i, l in [('all', ''), ('learner', 'L-'), ('nonlearner', 'N-'), ('control', 'C-')]:
+        for i in study_types:
+            l = i
             if skipall and i == 'all':
                 continue
             button_list.append(dict(args=[{'visible': masks['studyset'][i]['all']}], label=l + 'All', method='restyle'))
@@ -217,19 +219,19 @@ def step_buttons(plotmode, masks, step=None, showlegend=True, skipall=False):
     return updatemenus
 
 
-def plot_steps(masks):
+def plot_steps(masks, study_types):
     trace = []
     study = []
     # create steps for each trace
     for t, m in masks['trace'].items():
         trace.append(dict(label='{0}'.format(t),
-                          args=[{'visible': m['all']}, {'updatemenus': step_buttons('trace', masks, t)}],
+                          args=[{'visible': m['all']}, {'updatemenus': step_buttons('trace', masks, study_types, t)}],
                           method='update'))
 
     # Now loop over list of study names and create buttons.
     for s, m in masks['study'].items():
         study.append(dict(label='{0}'.format(s),
-                          args=[{'visible': m['all']}, {'updatemenus': step_buttons('study', masks, s)}],
+                          args=[{'visible': m['all']}, {'updatemenus': step_buttons('study', masks, study_types, s)}],
                           method='update'))
     return study, trace
 
@@ -245,6 +247,7 @@ def plot_synapses(studylist,
     plotmode = plotmode.lower()
     # Use the smallest available radius as the default if one is not provided.
     radius = radius if radius else min(studylist[0][tracelist[0]])
+    study_types = set([s['Type'] for s in studylist])
 
     if centroid:
         centroidlist = []
@@ -311,7 +314,7 @@ def plot_synapses(studylist,
 
     masks = trace_masks(study_map, trace_map, type_map)
     if plotmode == 'studyset':
-        layout['updatemenus'] = step_buttons(plotmode, masks)
+        layout['updatemenus'] = step_buttons(plotmode, masks, study_types)
 
         for i in data:
             i['visible'] = True
@@ -321,7 +324,7 @@ def plot_synapses(studylist,
             currentvalue={"visible": True},
             len=.9,
         )]
-        (study_steps, trace_steps) = plot_steps(masks)
+        (study_steps, trace_steps) = plot_steps(masks, study_types)
 
         # Get the mask from the first step, which is in the 2nd element of the args list..
         if plotmode == 'study':
@@ -329,11 +332,11 @@ def plot_synapses(studylist,
             sname = studylist[0]['Study']
             mask = masks['study'][sname]['all']
             sliders[0]['steps'] = study_steps
-            layout['updatemenus'] = step_buttons(plotmode, masks, sname)
+            layout['updatemenus'] = step_buttons(plotmode, masks, study_types, sname)
         else:
             mask = masks['trace'][tracelist[0]]['all']
             sliders[0]['steps'] = trace_steps
-            layout['updatemenus'] = step_buttons(plotmode, masks, tracelist[0])
+            layout['updatemenus'] = step_buttons(plotmode, masks, study_types, tracelist[0])
 
         # Set first step to be visible
         for i in range(len(data)):
