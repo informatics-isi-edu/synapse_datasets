@@ -247,6 +247,17 @@ def synapse_density(synapses, smax, smin, nbins=10, plane=None):
     # Now add another array for density.
     ds['density'] = ds['counts'] / ds['counts'].sum()
 
+    # Now compute the center of mass and add this as an attribute
+    plane_mass = ds['density'].sum(plane[0])
+    total_mass = plane_mass.sum()
+    # Now compute the sum of the product of the mass times the distance.
+    distance = xr.DataArray(range(1, plane_mass.shape[0]+1), dims=plane[1])
+    centermass_0 = ((plane_mass * distance).sum()) / total_mass
+    plane_mass = ds['density'].sum(plane[1])
+    total_mass = plane_mass.sum()
+    # Now compute the sum of the product of the mass times the distance.
+    distance = xr.DataArray(range(1, plane_mass.shape[0]+1), dims=plane[0])
+    centermass_1 = (((plane_mass * distance).sum()) / total_mass)
     return ds
 
 
