@@ -95,7 +95,7 @@ def position_layout(minx, miny, minz, maxx, maxy, maxz):
                        range=[miny, maxy],
                        color='green'),
             zaxis=dict(title='Z Axis',
-                      range=[minz, maxz],autorange='reversed',
+                      range=[minz, maxz],
                        color='blue', ),
 
             camera=dict(up=dict(x=0, y=0, z=1)),
@@ -108,6 +108,15 @@ def position_layout(minx, miny, minz, maxx, maxy, maxz):
 
 
 def trace_masks(study_map, trace_map, type_map):
+    """
+    Walk over the maps of studyname->index, tracename->index and type->index and create masks for the buttons.
+
+    :param study_map: a dictionary in the form SName: {TraceName : [list of trace-indexes]}
+    :param trace_map: is a dictionary in the from TName: {SName : [list of trace-indexes]} where TName is the one of
+    AlignedPairedBefore, AlignedUnpairedBefore, ....
+    :param type_map: a dictionary whose keys are study IDs and whose values are the type of study (learner, nonlearner..)
+    :return:
+    """
     study = OrderedDict()
     studyset = {}
     trace = OrderedDict()
@@ -119,14 +128,18 @@ def trace_masks(study_map, trace_map, type_map):
             trace_cnt = max(trace_cnt, idx)
     trace_cnt = trace_cnt + 1
 
-    study_types = set([v for k, v in type_map.items()])
-    study_types.add('all')
+    type_set = {v for k, v in type_map.items()}
+    study_types = ['all']
+    if 'learner' in type_set:
+        study_types.append('learner')
+    if 'nonlearner' in type_set:
+       study_types.append('nonlearner')
+    study_types.extend([i for i in type_set if 'control' in i])
 
     for i in study_types:
         studyset[i] = {j: [False] * trace_cnt for j in ['all', 'before', 'after']}
 
     # create mask for each trace
-
     for t, v in trace_map.items():
         trace[t] = {}
         for i in study_types:
@@ -137,67 +150,78 @@ def trace_masks(study_map, trace_map, type_map):
             trace[t][type_map[s]][idx] = True
 
     # Create masks for each study.
-
     for s, v in study_map.items():
         study[s] = {i: [False] * trace_cnt for i in ['all', 'before', 'after']}
         for t, idx in v.items():
             study[s]['all'][idx] = True
-            for i in study_types:
-                studyset[i]['all'][idx] = True
+            studyset['all']['all'][idx] = True
+            studyset[type_map[s]]['all'][idx] = True
 
             if 'Before' in t:
                 study[s]['before'][idx] = True
                 studyset['all']['before'][idx] = True
-                for i in study_types:
-                    if type_map[s] == i:
-                        studyset[i]['before'][idx] = True
+                studyset[type_map[s]]['before'][idx] = True
             elif 'After' in t:
                 study[s]['after'][idx] = True
                 studyset['all']['after'][idx] = True
-                for i in study_types:
-                    if type_map[s] == i:
-                        studyset[i]['after'][idx] = True
+                studyset[type_map[s]]['after'][idx] = True
 
     return {'trace': trace, 'study': study, 'studyset': studyset}
 
 
-def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipall=False, ):
+def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipall=False):
     button_list = []
     plotmode = plotmode.lower()
-    print(study_types)
-    study_types.append('all')
+    study_types = ['all'] + study_types
 
     if plotmode == 'trace':
         for i in study_types:
             l = i.capitalize()
             button_list.append(dict(args=[{'visible': masks['trace'][step][i]}], label=l, method='restyle'))
+            updatemenus = list([
+                dict(buttons=button_list, direction='left', showactive=True, type='buttons',
+                     xanchor='left', yanchor='top', x=0, y=1.05, )]
+            )
     elif plotmode == 'study':
         button_list.append(dict(args=[{'visible': masks['study'][step]['all']}], label='All', method='update'))
         button_list.append(dict(args=[{'visible': masks['study'][step]['before']}], label='Before', method='update'))
         button_list.append(dict(args=[{'visible': masks['study'][step]['after']}], label='After', method='update'))
+        updatemenus = list([
+            dict(buttons=button_list, direction='left', showactive=True, type='buttons',
+                 xanchor='left', yanchor='top', x=0, y=1.05, )]
+        )
     else:  # studyset
-        for i in study_types:
-            l = i
+        # split types into controls and others...
+        controls = [i for i in study_types if 'control' in i]
+        others = [i for i in study_types if not 'control' in i]
+
+        # First lay out the buttons for all, learners and nonlearners....
+        for i in others:
+            l = i.capitalize()
             if skipall and i == 'all':
                 continue
-            button_list.append(dict(args=[{'visible': masks['studyset'][i]['all']}], label=l + 'All', method='restyle'))
-            button_list.append(
-                dict(args=[{'visible': masks['studyset'][i]['before']}], label=l + 'Before', method='restyle'))
-            button_list.append(
-                dict(args=[{'visible': masks['studyset'][i]['after']}], label=l + 'After', method='restyle'))
+            smask = masks['studyset'][i]
+            button_list.append(dict(args=[{'visible': smask['all']}], label=l + ' All', method='restyle'))
+            button_list.append(dict(args=[{'visible': smask['before']}], label='Before', method='restyle'))
+            button_list.append(dict(args=[{'visible': smask['after']}], label='After', method='restyle'))
+            updatemenus = list([
+                dict(buttons=button_list, direction='left', showactive=True, type='buttons',
+                     xanchor='left', yanchor='top', x=0, y=1.05, )]
+            )
 
-    updatemenus = list([
-        dict(
-            buttons=button_list,
-            direction='left',
-            showactive=True,
-            type='buttons',
-            xanchor='left',
-            x=0,
-            y=1.05,
-            yanchor='top'
-        )]
-    )
+        # Now put in buttons for controls....
+        y = .96
+        for i in controls:
+            smask = masks['studyset'][i]
+            control_buttons = []
+            l = i
+            control_buttons.append(dict(args=[{'visible': smask['all']}], label=l + 'All', method='restyle'))
+            control_buttons.append(dict(args=[{'visible': smask['before']}], label='Before', method='restyle'))
+            control_buttons.append(dict(args=[{'visible': smask['after']}], label='After', method='restyle'))
+            updatemenus.append(
+                dict(buttons=control_buttons, direction='left', showactive=True, type='buttons',
+                     xanchor='left', yanchor='top', x=0, y=y, ))
+            y = y - .05
 
     if showlegend:
         updatemenus.append(
@@ -235,6 +259,17 @@ def plot_steps(masks, study_types):
                           method='update'))
     return study, trace
 
+def studytypes(studylist):
+    # Get the list of study types, and order as learner, nonlearner, controls....
+    type_set = {s['Type'] for s in studylist}
+    study_types = []
+    if 'learner' in type_set:
+        study_types.append('learner')
+    if 'nonlearner' in type_set:
+        study_types.append('nonlearner')
+    study_types.extend([i for i in type_set if 'control' in i])
+    return(study_types)
+
 
 def plot_synapses(studylist,
                   tracelist=['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter'],
@@ -247,7 +282,10 @@ def plot_synapses(studylist,
     plotmode = plotmode.lower()
     # Use the smallest available radius as the default if one is not provided.
     radius = radius if radius else min(studylist[0][tracelist[0]])
-    study_types = set([s['Type'] for s in studylist])
+
+    # Get the list of study types, and order as learner, nonlearner, controls....
+    type_set = {s['Type'] for s in studylist}
+    study_types = studytypes(studylist)
 
     if centroid:
         centroidlist = []
@@ -257,18 +295,17 @@ def plot_synapses(studylist,
         tracelist = tracelist + centroidlist
     data = []
 
-    maxx, maxy, maxz, minx, miny, minz = -float('inf'), -float('inf'), -float('inf'), float('inf'), float('inf'), float(
-        'inf')
+    maxx, maxy, maxz, = [-float('inf')] * 3
+    minx, miny, minz = [float('inf')] * 3
 
     # We would like studies and traces to remain in user specified order....
-    study_map = OrderedDict()
-    trace_map = OrderedDict()
+    study_map, trace_map = [OrderedDict(), OrderedDict()]
     for s in studylist:
         study_map[s['Study']] = OrderedDict()
     for t in tracelist:
         trace_map[t] = OrderedDict()
-    type_map = {}
 
+    type_map = {}
     for s in studylist:
         sname = s['Study']
         for idx, t in enumerate(tracelist):

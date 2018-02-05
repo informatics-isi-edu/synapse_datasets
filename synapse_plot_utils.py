@@ -74,8 +74,9 @@ pair_types = ['PairedBefore', 'PairedAfter',
               'AlignedUnpairedBefore', 'AlignedUnpairedAfter']
 
 def group_studies(studies, group='Type'):
-    '''
-    Return a dictionary whose key it a type, subject, or alignment and whose value is a list of studies'''
+    """
+    Return a dictionary whose key it a type, subject, or alignment and whose value is a list of studies
+    """
     if group == 'Type':
         key = 'Type'
     if group == 'Subject':
@@ -183,31 +184,24 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
 
 def aggregate_pairs(studylist, tracelist):
     '''
-    Go through the list of studies and agregate all of the synapes into a single list.
+    Go through the list of studies and agregate all of the synapses into a single list.
     :param studylist:
-    :param tracelist:
-    :return:
+    :param tracelist: a list of the traces that you want in the final aggregate
+    :return: A dictionary for all, learners, nonlearners, and each control type, that aggregates
+            the synapses by the all, before and after.
     '''
     r = min(studylist[0][tracelist[0]])
 
-    synapses = {}
-    synapses['all'] = {'all': pd.DataFrame(columns=['x', 'y', 'z']),
-                       'before': pd.DataFrame(columns=['x', 'y', 'z']),
-                       'after': pd.DataFrame(columns=['x', 'y', 'z'])}
+    study_types = { s['Type'] for s in studylist}
+    study_types.add('all')
 
-    synapses['learner'] = {'all': pd.DataFrame(columns=['x', 'y', 'z']),
-                           'before': pd.DataFrame(columns=['x', 'y', 'z']),
-                           'after': pd.DataFrame(columns=['x', 'y', 'z'])}
+    # Initialize resulting synapse dictionary so we have an entry for each study type.
+    synapses = {t : {'all': pd.DataFrame(columns=['x', 'y', 'z']),
+                     'before': pd.DataFrame(columns=['x', 'y', 'z']),
+                     'after': pd.DataFrame(columns=['x', 'y', 'z'])}
+                for t in study_types
+                }
 
-    synapses['nonlearner'] = {'all': pd.DataFrame(columns=['x', 'y', 'z']),
-                              'before': pd.DataFrame(columns=['x', 'y', 'z']),
-                              'after': pd.DataFrame(columns=['x', 'y', 'z'])}
-
-    for i in ['conditioned-control', 'unconditioned-control',
-              'fullcycle-control', 'groundtruth-control', 'interval-groundtruth-control']:
-        synapses[i] = {'all': pd.DataFrame(columns=['x', 'y', 'z']),
-                           'before': pd.DataFrame(columns=['x', 'y', 'z']),
-                           'after': pd.DataFrame(columns=['x', 'y', 'z'])}
     for s in studylist:
         before = s['AlignedUnpairedBefore'][r]['Data']
         after = s['AlignedUnpairedAfter'][r]['Data']
