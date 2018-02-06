@@ -256,7 +256,7 @@ def synapse_density(synapses, smax, smin, nbins=10, plane=None):
         centermass_1 = centermass_1 + float(i) * float(plane_mass.loc[i])
     centermass_1 = centermass_1 / float(plane_mass.sum())
 
-    ds['density'].attrs['center_of_mass'] = (centermass_0, centermass_1)
+    ds['density'].attrs['center_of_mass'] = (centermass_1, centermass_0)
 
     return ds
 
