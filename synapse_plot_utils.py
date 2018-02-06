@@ -182,7 +182,7 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
                     s[cname]['Type'] = s['Type']
 
 
-def aggregate_pairs(studylist, tracelist):
+def aggregate_pairs(studylist):
     '''
     Go through the list of studies and agregate all of the synapses into a single list.
     :param studylist:
@@ -190,7 +190,7 @@ def aggregate_pairs(studylist, tracelist):
     :return: A dictionary for all, learners, nonlearners, and each control type, that aggregates
             the synapses by the all, before and after.
     '''
-    r = min(studylist[0][tracelist[0]])
+    r = min(studylist[0]['AlignedUnpairedBefore'])
 
     study_types = { s['Type'] for s in studylist}
     study_types.add('all')
@@ -205,7 +205,6 @@ def aggregate_pairs(studylist, tracelist):
     for s in studylist:
         before = s['AlignedUnpairedBefore'][r]['Data']
         after = s['AlignedUnpairedAfter'][r]['Data']
-
         synapses['all']['before'] = synapses['all']['before'].append(before, ignore_index=True)
         synapses['all']['after'] = synapses['all']['after'].append(after, ignore_index=True)
         synapses[s['Type']]['before'] = synapses[s['Type']]['before'].append(before, ignore_index=True)
@@ -224,10 +223,9 @@ def synapse_density(synapses, smax, smin, nbins=10, plane=None):
     binsize = min([smax[i] - smin[i] for i in range(3)]) / nbins
 
     bins = {}
-    for idx, c in enumerate(['x', 'y', 'z']):
+    for idx, c in enumerate(plane):
         # The number of bins will be determined by the range on the access and the binsize
         nbins = ceil((smax[idx] - smin[idx]) / binsize)
-
         # Now create an index that maps the coordinates into the bins
         bins[c] = pd.cut(synapses[c],
                       [smin[idx] + i * binsize for i in range(nbins + 1)],
@@ -235,29 +233,31 @@ def synapse_density(synapses, smax, smin, nbins=10, plane=None):
                       include_lowest=True)
 
     # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
-#    density = synapses['x'].groupby([bins[plane[0]], bins[plane[1]]]).count().reset_index(name='count')
-#    density['density'] = density['count']/len(synapses)
-
     counts = synapses.groupby([bins[plane[0]], bins[plane[1]]]).size()
 
     # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
     # fill in the NaN that result from empty bins with 0.
     ds = xr.Dataset({'counts': counts}).unstack('dim_0').fillna(0)
+    ds.attrs['binsize'] = binsize
 
     # Now add another array for density.
     ds['density'] = ds['counts'] / ds['counts'].sum()
 
     # Now compute the center of mass and add this as an attribute
-    plane_mass = ds['density'].sum(plane[0])
-    total_mass = plane_mass.sum()
-    # Now compute the sum of the product of the mass times the distance.
-    distance = xr.DataArray(range(1, plane_mass.shape[0]+1), dims=plane[1])
-    centermass_0 = ((plane_mass * distance).sum()) / total_mass
     plane_mass = ds['density'].sum(plane[1])
-    total_mass = plane_mass.sum()
-    # Now compute the sum of the product of the mass times the distance.
-    distance = xr.DataArray(range(1, plane_mass.shape[0]+1), dims=plane[0])
-    centermass_1 = (((plane_mass * distance).sum()) / total_mass)
+    centermass_0 = 0
+    for i in plane_mass.coords[plane[0]]:
+        centermass_0 = centermass_0 + float(i) * float(plane_mass.loc[i])
+    centermass_0 = centermass_0 / float(plane_mass.sum())
+
+    plane_mass = ds['density'].sum(plane[0])
+    centermass_1 = 0
+    for i in plane_mass.coords[plane[1]]:
+        centermass_1 = centermass_1 + float(i) * float(plane_mass.loc[i])
+    centermass_1 = centermass_1 / float(plane_mass.sum())
+
+    ds['density'].attrs['center_of_mass'] = (centermass_0, centermass_1)
+
     return ds
 
 

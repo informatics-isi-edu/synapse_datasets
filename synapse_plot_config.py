@@ -100,6 +100,7 @@ def position_layout(minx, miny, minz, maxx, maxy, maxz):
 
             camera=dict(up=dict(x=0, y=0, z=1)),
             aspectmode='cube',
+            domain=dict(y=[0,.9]),
         #    dragmode='turntable',
             annotations=position_annotations(minx, miny, minz, maxx, maxy, maxz)
         )
@@ -169,7 +170,7 @@ def trace_masks(study_map, trace_map, type_map):
     return {'trace': trace, 'study': study, 'studyset': studyset}
 
 
-def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipall=False):
+def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipall=False, title = ""):
     button_list = []
     plotmode = plotmode.lower()
     study_types = ['all'] + study_types
@@ -196,32 +197,39 @@ def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipa
         others = [i for i in study_types if not 'control' in i]
 
         # First lay out the buttons for all, learners and nonlearners....
+        y=1.05
         for i in others:
             l = i.capitalize()
             if skipall and i == 'all':
                 continue
             smask = masks['studyset'][i]
-            button_list.append(dict(args=[{'visible': smask['all']}], label=l + ' All', method='restyle'))
-            button_list.append(dict(args=[{'visible': smask['before']}], label='Before', method='restyle'))
-            button_list.append(dict(args=[{'visible': smask['after']}], label='After', method='restyle'))
+            button_list.append(dict(args=[{'visible': smask['all']}, {'title' : title + l + ' All'}],
+                                    label=l + ' All', method='update'))
+            button_list.append(dict(args=[{'visible': smask['before']}, {'title' : title + l + ' Before'}],
+                                    label='Before', method='update'))
+            button_list.append(dict(args=[{'visible': smask['after']}, {'title' : title + l + ' After'}],
+                                    label='After', method='update'))
             updatemenus = list([
-                dict(buttons=button_list, direction='left', showactive=True, type='buttons',
-                     xanchor='left', yanchor='top', x=0, y=1.05, )]
+                dict(buttons=button_list, direction='left', showactive=False, type='buttons',
+                     xanchor='left', yanchor='top', x=0, y=y, )]
             )
 
         # Now put in buttons for controls....
-        y = .96
+        y = y - .07
         for i in controls:
             smask = masks['studyset'][i]
             control_buttons = []
-            l = i
-            control_buttons.append(dict(args=[{'visible': smask['all']}], label=l + 'All', method='restyle'))
-            control_buttons.append(dict(args=[{'visible': smask['before']}], label='Before', method='restyle'))
-            control_buttons.append(dict(args=[{'visible': smask['after']}], label='After', method='restyle'))
+            l = i.capitalize()
+            control_buttons.append(dict(args=[{'visible': smask['all']}, {'title' : title + l + ' All'}],
+                                        label=l + ' All', method='update'))
+            control_buttons.append(dict(args=[{'visible': smask['before']}, {'title' : title + l + ' All'}],
+                                        label='Before', method='update'))
+            control_buttons.append(dict(args=[{'visible': smask['after']}, {'title' : title + l + ' All'}],
+                                        label='After', method='update'))
             updatemenus.append(
-                dict(buttons=control_buttons, direction='left', showactive=True, type='buttons',
+                dict(buttons=control_buttons, direction='left', showactive=False, type='buttons',
                      xanchor='left', yanchor='top', x=0, y=y, ))
-            y = y - .05
+            y = y - .07
 
     if showlegend:
         updatemenus.append(
