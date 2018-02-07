@@ -234,7 +234,6 @@ def synapse_density(synapses, smax, smin, nbins=10, plane=None):
 
     # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
     counts = synapses.groupby([bins[plane[0]], bins[plane[1]]]).size()
-
     # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
     # fill in the NaN that result from empty bins with 0.
     ds = xr.Dataset({'counts': counts}).unstack('dim_0').fillna(0)
