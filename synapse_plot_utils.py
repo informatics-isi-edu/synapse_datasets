@@ -14,7 +14,7 @@ from synspy.analyze.pair import SynapticPairStudy, ImageGrossAlignment, transfor
 
 from deriva.core import HatracStore, ErmrestCatalog, get_credential
 
-def get_studies():
+def get_studies(studyset):
 
     credential = get_credential("synapse.isrd.isi.edu")
     ermrest_catalog = ErmrestCatalog('https', 'synapse.isrd.isi.edu', 1, credential)
@@ -24,7 +24,7 @@ def get_studies():
     ermrest_snapshot = catalog_snapshot()
 
 # Get the current list of studies from the server.
-    study_entities = synapse_utils.get_synapse_studies()
+    study_entities = synapse_utils.get_synapse_studies(studyset)
 
     print('Identified %d studies' % len(study_entities))
 
@@ -172,6 +172,7 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
 
                     # now compute the aligned centroids and store as pandas.
                     centroid = tuple([p['x'].mean(), p['y'].mean(), p['z'].mean()])
+                    pc = pd.DataFrame.from_records([centroid], columns=['x', 'y', 'z'])
                     pc = pd.DataFrame.from_records([centroid], columns=['x', 'y', 'z'])
                     cname = datatype + 'Centroid'
                     s[cname] = s.get(cname, dict())

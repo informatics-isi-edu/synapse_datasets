@@ -148,7 +148,7 @@ def synapses_to_bag(study_list, dest, protocol_types, bag_metadata=None, publish
     return archivefile
 
 
-def get_synapse_studies(protocols=None):
+def get_synapse_studies(studyset, protocols=None):
     """
     Get the current list of synapse studys.
     :param protocols:
@@ -166,18 +166,18 @@ def get_synapse_studies(protocols=None):
     synapse = pb.Synapse
 
     # Lets get some shortcuts for awkward table names.
+    cohort_table = zebrafish.tables['Cohort Analysis']
     study_table = zebrafish.tables['Synaptic Pair Study']
     pair_table = zebrafish.tables['Image Pair Study']
 
-    # Build up the path study->pair->behavior.
+    # Build up the path cohort->study->pair->behavior.
     # Make aliases for study and pair instances for later use.
     # We use the left join to make sure we get controls, which will be studies without behaviors.
-    path = study_table.alias('study')\
-        .link(pair_table.alias('pair'))\
+    path = cohort_table.alias('studyset')\
+        .link(zebrafish.tables['Cohort Analysis_Synaptic Pair Study']) \
+        .link(study_table.alias('study')) \
+        .link(pair_table.alias('pair')) \
         .link(zebrafish.Behavior, join_type='left', on=(pair_table.Subject == zebrafish.Behavior.Subject))
-
-    # We only want pairs that have segmented values, so check to make sure both URLs are there
-    path = path.filter( ~((path.study.columns['Region 1 URL'] == '') | (path.study.columns['Region 2 URL'] == '')))
 
     # Now lets go back an pick up the protocols which are associated with an image.
     # Each image has a protocol step, and from the step we can get the protocol.
@@ -186,7 +186,10 @@ def get_synapse_studies(protocols=None):
         .link(synapse.tables['Protocol Step']) \
         .link(synapse.Protocol)
 
-    # Subset on a list of protocols
+    # Now just pick out the studyset we want.
+    path = path.filter(path.studyset.RID == studyset)
+
+        # Subset on a list of protocols
     if not protocols:
         pass
 
