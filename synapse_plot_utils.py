@@ -12,9 +12,9 @@ import subprocess
 import synapse_utils
 from synspy.analyze.pair import SynapticPairStudy, ImageGrossAlignment, transform_points
 
-from deriva.core import HatracStore, ErmrestCatalog, get_credential
+from deriva.core import HatracStore, ErmrestCatalog, get_credential, DerivaPathError
 
-def get_studies(studyset):
+def get_studies(studyid):
 
     credential = get_credential("synapse.isrd.isi.edu")
     ermrest_catalog = ErmrestCatalog('https', 'synapse.isrd.isi.edu', 1, credential)
@@ -24,7 +24,7 @@ def get_studies(studyset):
     ermrest_snapshot = catalog_snapshot()
 
 # Get the current list of studies from the server.
-    study_entities = synapse_utils.get_synapse_studies(studyset)
+    study_entities = synapse_utils.get_synapse_studies(studyid)
 
     print('Identified %d studies' % len(study_entities))
 
@@ -51,6 +51,7 @@ def get_studies(studyset):
         try:
             i['Aligned'] = False
             i['Provenence'] = { 'GITHash': githash , 'CatlogVersion': ermrest_snapshot}
+            i['StudyID'] = studyid
             i['Alignment'] = ImageGrossAlignment.from_image_id(ermrest_catalog, i['BeforeImageID'])
             p = pd.DataFrame([i[pt] for pt in ['AlignP0', 'AlignP1', 'AlignP2']])
             p =  p.multiply(pd.DataFrame([{'z': 0.4, 'y': 0.26, 'x': 0.26}]*3))
@@ -64,7 +65,12 @@ def get_studies(studyset):
             print('Alignment Code Failed for study: {0}'.format(i['Study']))
             continue
 
-    return list(study_entities)
+    return { 'StudyID': studyid,
+             'Studies': list(study_entities),
+             'Provenence': {'GITHash': githash, 'CatlogVersion': ermrest_snapshot}
+             }
+
+
 
 
 # Helpful list....
@@ -96,13 +102,19 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
     ermrest_catalog = ErmrestCatalog('https', 'synapse.isrd.isi.edu', 1, credential)
     hatrac_store = HatracStore('https', 'synapse.isrd.isi.edu', credentials=credential)
 
+    pairlist = []
     for s in studylist:
         syn_study_id = s['Study']
         s['Paired'] = True
 
         print('Processing study {0}'.format(syn_study_id))
         study = SynapticPairStudy.from_study_id(ermrest_catalog, syn_study_id)
-        study.retrieve_data(hatrac_store)
+        try:
+            study.retrieve_data(hatrac_store)
+        except DerivaPathError:
+            print('Study {0} missing synaptic pair'.format(syn_study_id))
+            continue
+        pairlist.append(s)
 
         # Compute the actual pairs for the given distances
         s1_to_s2, s2_to_s1 = study.syn_pairing_maps(radii, ratio, maxratio)
@@ -181,15 +193,16 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
                     s[cname]['Study'] = s['Study']
                     s[cname]['Radius'] = r
                     s[cname]['Type'] = s['Type']
+    return pairlist
 
 
-def aggregate_pairs(studylist):
+def aggregate_studies(studylist):
     '''
-    Go through the list of studies and agregate all of the synapses into a single list.
+    Go through the list of studies and agregate all of the synapses into a single list for each study type.
     :param studylist:
     :param tracelist: a list of the traces that you want in the final aggregate
     :return: A dictionary for all, learners, nonlearners, and each control type, that aggregates
-            the synapses by the all, before and after.
+            the synapses by the all, before and after and paired.
     '''
     r = min(studylist[0]['AlignedUnpairedBefore'])
 
@@ -197,21 +210,25 @@ def aggregate_pairs(studylist):
     study_types.add('all')
 
     # Initialize resulting synapse dictionary so we have an entry for each study type.
-    synapses = {t : {'all': pd.DataFrame(columns=['x', 'y', 'z']),
-                     'before': pd.DataFrame(columns=['x', 'y', 'z']),
-                     'after': pd.DataFrame(columns=['x', 'y', 'z'])}
+    synapses = {t : {'All': pd.DataFrame(columns=['x', 'y', 'z']),
+                     'PairedBefore': pd.DataFrame(columns=['x', 'y', 'z']),
+                     'PairedAfter': pd.DataFrame(columns=['x', 'y', 'z']),
+                     'UnpairedBefore': pd.DataFrame(columns=['x', 'y', 'z']),
+                     'UnpairedAfter': pd.DataFrame(columns=['x', 'y', 'z'])}
                 for t in study_types
                 }
-
+    max_x, max_y, max_z =  -float('inf'), -float('inf') , -float('inf')
+    min_x, min_y, min_z =  float('inf'), float('inf') , float('inf')
     for s in studylist:
-        before = s['AlignedUnpairedBefore'][r]['Data']
-        after = s['AlignedUnpairedAfter'][r]['Data']
-        synapses['all']['before'] = synapses['all']['before'].append(before, ignore_index=True)
-        synapses['all']['after'] = synapses['all']['after'].append(after, ignore_index=True)
-        synapses[s['Type']]['before'] = synapses[s['Type']]['before'].append(before, ignore_index=True)
-        synapses[s['Type']]['after'] = synapses[s['Type']]['after'].append(after, ignore_index=True)
+        for i in ['UnpairedBefore', 'UnpairedAfter', 'PairedBefore', 'PairedAfter']:
+            pts = s['Aligned' + i][r]['Data']
+            synapses['all'][i] = synapses['all'][i].append(pts, ignore_index=True)
+            synapses[s['Type']][i] = synapses[s['Type']][i].append(pts, ignore_index=True)
+            max_x, max_y, max_z = max(max_x, pts.max()['x']), max(max_y, pts.max()['y']), max(max_z, pts.max()['z'])
+            min_x, min_y, min_z = min(min_x, pts.min()['x']), min(min_y, pts.min()['y']), min(min_z, pts.min()['z'])
+    return synapses, (max_x, max_y, max_z), (min_x, min_y, min_z)
 
-    return synapses
+
 
 
 def synapse_density(synapses, smax, smin, nbins=10, plane=None):
@@ -256,22 +273,22 @@ def synapse_density(synapses, smax, smin, nbins=10, plane=None):
         centermass_1 = centermass_1 + float(i) * float(plane_mass.loc[i])
     centermass_1 = centermass_1 / float(plane_mass.sum())
 
-    ds['density'].attrs['center_of_mass'] = (centermass_1, centermass_0)
+    ds['density'].attrs['center_of_mass'] = (centermass_0, centermass_1)
 
     return ds
 
 
-def dump_studies(slist, fname):
+def dump_studies(sset, fname):
     with open(fname, 'wb') as fo:
-        pickle.dump(slist, fo)
-        print('dumped {0} studies to {1}'.format(len(slist), fname))
+        pickle.dump(sset, fo)
+        print('dumped {0} studies to {1}'.format(len(sset['Studies']), fname))
 
 
 def restore_studies(fname):
     with open(fname, 'rb') as fo:
         slist = pickle.load(fo)
 
-    print('Restored {0} studies'.format(len(slist)))
+    print('Restored {0} studies'.format(len(slist['Studies'])))
     return slist
 
 

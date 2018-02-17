@@ -138,7 +138,7 @@ def trace_masks(study_map, trace_map, type_map):
     study_types.extend([i for i in type_set if 'control' in i])
 
     for i in study_types:
-        studyset[i] = {j: [False] * trace_cnt for j in ['all', 'before', 'after']}
+        studyset[i] = {j: [False] * trace_cnt for j in ['all', 'before', 'after', 'paired']}
 
     # create mask for each trace
     for t, v in trace_map.items():
@@ -158,14 +158,18 @@ def trace_masks(study_map, trace_map, type_map):
             studyset['all']['all'][idx] = True
             studyset[type_map[s]]['all'][idx] = True
 
-            if 'Before' in t:
+            if 'UnpairedBefore' in t:
                 study[s]['before'][idx] = True
                 studyset['all']['before'][idx] = True
                 studyset[type_map[s]]['before'][idx] = True
-            elif 'After' in t:
+            elif 'UnpairedAfter' in t:
                 study[s]['after'][idx] = True
                 studyset['all']['after'][idx] = True
                 studyset[type_map[s]]['after'][idx] = True
+            elif 'PairedBefore' in t:
+                study[s]['after'][idx] = True
+                studyset['all']['paired'][idx] = True
+                studyset[type_map[s]]['paired'][idx] = True
 
     return {'trace': trace, 'study': study, 'studyset': studyset}
 
@@ -187,6 +191,7 @@ def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipa
         button_list.append(dict(args=[{'visible': masks['study'][step]['all']}], label='All', method='update'))
         button_list.append(dict(args=[{'visible': masks['study'][step]['before']}], label='Before', method='update'))
         button_list.append(dict(args=[{'visible': masks['study'][step]['after']}], label='After', method='update'))
+        button_list.append(dict(args=[{'visible': masks['study'][step]['paired']}], label='Paired', method='update'))
         updatemenus = list([
             dict(buttons=button_list, direction='left', showactive=True, type='buttons',
                  xanchor='left', yanchor='top', x=0, y=1.05, )]
@@ -198,24 +203,28 @@ def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipa
 
         # First lay out the buttons for all, learners and nonlearners....
         y=1.05
-        for i in others:
+        updatemenus = []
+        for i in study_types: # others:
             l = i.capitalize()
             if skipall and i == 'all':
                 continue
             smask = masks['studyset'][i]
+            button_list = []
             button_list.append(dict(args=[{'visible': smask['all']}, {'title' : title + l + ' All'}],
                                     label=l + ' All', method='update'))
             button_list.append(dict(args=[{'visible': smask['before']}, {'title' : title + l + ' Before'}],
                                     label='Before', method='update'))
             button_list.append(dict(args=[{'visible': smask['after']}, {'title' : title + l + ' After'}],
                                     label='After', method='update'))
-            updatemenus = list([
+            button_list.append(dict(args=[{'visible': smask['paired']}, {'title' : title + l + ' Paired'}],
+                                    label='Paired', method='update'))
+            updatemenus.append(
                 dict(buttons=button_list, direction='left', showactive=False, type='buttons',
-                     xanchor='left', yanchor='top', x=0, y=y, )]
-            )
+                     xanchor='left', yanchor='top', x=0, y=y, ))
+            y = y - .05
 
         # Now put in buttons for controls....
-        y = y - .07
+
         for i in controls:
             smask = masks['studyset'][i]
             control_buttons = []
@@ -226,10 +235,12 @@ def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipa
                                         label='Before', method='update'))
             control_buttons.append(dict(args=[{'visible': smask['after']}, {'title' : title + l + ' All'}],
                                         label='After', method='update'))
-            updatemenus.append(
-                dict(buttons=control_buttons, direction='left', showactive=False, type='buttons',
-                     xanchor='left', yanchor='top', x=0, y=y, ))
-            y = y - .07
+            control_buttons.append(dict(args=[{'visible': smask['paired']}, {'title' : title + l + ' All'}],
+                                        label='Paired', method='update'))
+   #         updatemenus.append(
+   #             dict(buttons=control_buttons, direction='left', showactive=False, type='buttons',
+   #                  xanchor='left', yanchor='top', x=0, y=y, ))
+   #         y = y - .07
 
     if showlegend:
         updatemenus.append(
@@ -283,7 +294,8 @@ def plot_synapses(studylist,
                   tracelist=['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter'],
                   plotmode='Study',
                   radius=False,
-                  centroid=False):
+                  centroid=False,
+                  skipall=False):
     # Change this if you want the point sizes in the plots to be different
     pt_size = 4
 
@@ -359,7 +371,7 @@ def plot_synapses(studylist,
 
     masks = trace_masks(study_map, trace_map, type_map)
     if plotmode == 'studyset':
-        layout['updatemenus'] = step_buttons(plotmode, masks, study_types)
+        layout['updatemenus'] = step_buttons(plotmode, masks, study_types, skipall=skipall)
 
         for i in data:
             i['visible'] = True
