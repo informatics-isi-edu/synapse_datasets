@@ -152,7 +152,7 @@ def trace_masks(study_map, trace_map, type_map):
 
     # Create masks for each study.
     for s, v in study_map.items():
-        study[s] = {i: [False] * trace_cnt for i in ['all', 'before', 'after']}
+        study[s] = {i: [False] * trace_cnt for i in ['all', 'before', 'after', 'paired']}
         for t, idx in v.items():
             study[s]['all'][idx] = True
             studyset['all']['all'][idx] = True
