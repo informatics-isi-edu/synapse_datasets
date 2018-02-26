@@ -14,6 +14,7 @@ from synspy.analyze.pair import SynapticPairStudy, ImageGrossAlignment, transfor
 
 from deriva.core import HatracStore, ErmrestCatalog, get_credential, DerivaPathError
 
+
 def get_studies(studyid):
 
     credential = get_credential("synapse.isrd.isi.edu")
@@ -41,7 +42,7 @@ def get_studies(studyid):
     for i in study_entities:
         i['Paired'] = False
         if protocol_types[i['Protocol']] == 'aversion':
-            if i['Learner'] == True:
+            if i['Learner'] is True:
                 i['Type'] = 'learner'
             else:
                 i['Type'] = 'nonlearner'
@@ -50,11 +51,11 @@ def get_studies(studyid):
 
         try:
             i['Aligned'] = False
-            i['Provenence'] = { 'GITHash': githash , 'CatlogVersion': ermrest_snapshot}
+            i['Provenence'] = {'GITHash': githash, 'CatlogVersion': ermrest_snapshot}
             i['StudyID'] = studyid
             i['Alignment'] = ImageGrossAlignment.from_image_id(ermrest_catalog, i['BeforeImageID'])
             p = pd.DataFrame([i[pt] for pt in ['AlignP0', 'AlignP1', 'AlignP2']])
-            p =  p.multiply(pd.DataFrame([{'z': 0.4, 'y': 0.26, 'x': 0.26}]*3))
+            p = p.multiply(pd.DataFrame([{'z': 0.4, 'y': 0.26, 'x': 0.26}]*3))
             i['StudyAlignmentPts'] = pd.DataFrame(transform_points(i['Alignment'].M, p.loc[:,['x','y','z']]),
                                                  columns=['x', 'y', 'z'])
             i['Aligned'] = True
@@ -70,14 +71,12 @@ def get_studies(studyid):
              'Provenence': {'GITHash': githash, 'CatlogVersion': ermrest_snapshot}
              }
 
-
-
-
 # Helpful list....
 pair_types = ['PairedBefore', 'PairedAfter',
               'UnpairedBefore', 'UnpairedAfter',
               'AlignedPairedBefore', 'AlignedPairedAfter',
               'AlignedUnpairedBefore', 'AlignedUnpairedAfter']
+
 
 def group_studies(studies, group='Type'):
     """
@@ -197,41 +196,82 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
 
 
 def aggregate_studies(studylist):
-    '''
+    """
     Go through the list of studies and agregate all of the synapses into a single list for each study type.
     :param studylist:
-    :param tracelist: a list of the traces that you want in the final aggregate
     :return: A dictionary for all, learners, nonlearners, and each control type, that aggregates
-            the synapses by the all, before and after and paired.
-    '''
+            the synapses by the all, before and after and paired.  We only use the before paired.
+    """
     r = min(studylist[0]['AlignedUnpairedBefore'])
 
-    study_types = { s['Type'] for s in studylist}
+    study_types = {s['Type'] for s in studylist}
     study_types.add('all')
 
     # Initialize resulting synapse dictionary so we have an entry for each study type.
-    synapses = {t : {'All': pd.DataFrame(columns=['x', 'y', 'z']),
+    synapses = {t: {'All': pd.DataFrame(columns=['x', 'y', 'z']),
                      'PairedBefore': pd.DataFrame(columns=['x', 'y', 'z']),
                      'PairedAfter': pd.DataFrame(columns=['x', 'y', 'z']),
                      'UnpairedBefore': pd.DataFrame(columns=['x', 'y', 'z']),
                      'UnpairedAfter': pd.DataFrame(columns=['x', 'y', 'z'])}
                 for t in study_types
                 }
-    max_x, max_y, max_z =  -float('inf'), -float('inf') , -float('inf')
-    min_x, min_y, min_z =  float('inf'), float('inf') , float('inf')
+    max_x, max_y, max_z = -float('inf'), -float('inf'), -float('inf')
+    min_x, min_y, min_z = float('inf'), float('inf'), float('inf')
     for s in studylist:
-        for i in ['UnpairedBefore', 'UnpairedAfter', 'PairedBefore', 'PairedAfter']:
+        for i in ['UnpairedBefore', 'UnpairedAfter', 'PairedBefore']:
             pts = s['Aligned' + i][r]['Data']
             synapses['all'][i] = synapses['all'][i].append(pts, ignore_index=True)
             synapses[s['Type']][i] = synapses[s['Type']][i].append(pts, ignore_index=True)
+            synapses[s['Type']]['All'] = synapses[s['Type']]['All'].append(pts, ignore_index=True)
             max_x, max_y, max_z = max(max_x, pts.max()['x']), max(max_y, pts.max()['y']), max(max_z, pts.max()['z'])
             min_x, min_y, min_z = min(min_x, pts.min()['x']), min(min_y, pts.min()['y']), min(min_z, pts.min()['z'])
     return synapses, (max_x, max_y, max_z), (min_x, min_y, min_z)
 
+def bin_synapses(synapses, smax, smin, nbins=10):
+    """
+    Compute the density of a set of synapses. Input is a dictionary with key: All, PairedBefore, PairedAfter, ....
+    :param synapses:
+    :param smax: upper right corner of bounding box
+    :param smin: lower left corner of bounding box
+    :param nbins:
+    :param plane:
+    :return:
+    """
 
+    # Find the smallest range in x, y and z so we can figure out the bin sizes by dividing by the number of bins
+    binsize = min([smax[i] - smin[i] for i in range(3)]) / nbins
+    ds = xr.Dataset()
+    ds.attrs['binsize'] = binsize
+    for k,v in enumerate(synapses):
+        bins = {}
+        for idx, c in enumerate(['x', 'y', 'z']):
+            # The number of bins will be determined by the range on the access and the binsize
+            nbins = ceil((smax[idx] - smin[idx]) / binsize)
+            print(c, nbins)
+            # Now create an index that maps the coordinates into the bins
+            bins[c] = pd.cut(synapses[v][c],
+                             [smin[idx] + i * binsize for i in range(nbins + 1)],
+                             labels=[smin[idx] + i * binsize for i in range(nbins)],
+                             include_lowest=True)
 
+        # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
+        counts = synapses[v].groupby([bins['x'],bins['y'],bins['z']]).size()
+
+        # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
+        # fill in the NaN that result from empty bins with 0.
+        ds[v + 'Counts'] = xr.DataArray(counts).unstack('dim_0').fillna(0)
+    return ds
 
 def synapse_density(synapses, smax, smin, nbins=10, plane=None):
+    """
+    Compute the density of a set of synapses. Input is a dictionary with key: All, PairedBefore, PairedAfter, ....
+    :param synapses:
+    :param smax: upper right corner of bounding box
+    :param smin: lower left corner of bounding box
+    :param nbins:
+    :param plane:
+    :return:
+    """
 
     # Set the plane that we want to calculate density over.
     if not plane:
@@ -239,41 +279,41 @@ def synapse_density(synapses, smax, smin, nbins=10, plane=None):
 
     # Find the smallest range in x, y and z so we can figure out the bin sizes by dividing by the number of bins
     binsize = min([smax[i] - smin[i] for i in range(3)]) / nbins
-
-    bins = {}
-    for idx, c in enumerate(plane):
-        # The number of bins will be determined by the range on the access and the binsize
-        nbins = ceil((smax[idx] - smin[idx]) / binsize)
-        # Now create an index that maps the coordinates into the bins
-        bins[c] = pd.cut(synapses[c],
-                      [smin[idx] + i * binsize for i in range(nbins + 1)],
-                         labels=[smin[idx] + i * binsize for i in range(nbins)],
-                      include_lowest=True)
-
-    # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
-    counts = synapses.groupby([bins[plane[1]], bins[plane[0]]]).size()
-    # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
-    # fill in the NaN that result from empty bins with 0.
-    ds = xr.Dataset({'counts': counts}).unstack('dim_0').fillna(0)
+    ds = xr.Dataset()
     ds.attrs['binsize'] = binsize
+    for k,v in enumerate(synapses):
+        bins = {}
+        for idx, c in enumerate(['x', 'y', 'z']):
+            # The number of bins will be determined by the range on the access and the binsize
+            nbins = ceil((smax[idx] - smin[idx]) / binsize)
+            # Now create an index that maps the coordinates into the bins
+            bins[c] = pd.cut(synapses[v][c],
+                             [smin[idx] + i * binsize for i in range(nbins + 1)],
+                             labels=[smin[idx] + i * binsize for i in range(nbins)],
+                             include_lowest=True)
 
+        # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
+        counts = synapses[v].groupby([bins['x'],bins['y'],bins['z']]).size()
+
+        # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
+        # fill in the NaN that result from empty bins with 0.
+        ds[v + 'Counts'] = xr.DataArray(counts).unstack('dim_0').fillna(0)
     # Now add another array for density.
-    ds['density'] = ds['counts'] / ds['counts'].sum()
+    #  ds['density'] = ds['counts'] / ds['counts'].sum()
 
     # Now compute the center of mass and add this as an attribute
-    plane_mass = ds['density'].sum(plane[1])
-    centermass_0 = 0
-    for i in plane_mass.coords[plane[0]]:
-        centermass_0 = centermass_0 + float(i) * float(plane_mass.loc[i])
-    centermass_0 = centermass_0 / float(plane_mass.sum())
+    # plane_mass = ds['density'].sum(plane[1])
+    # centermass_0 = 0
+    #   centermass_0 = centermass_0 + float(i) * float(plane_mass.loc[i])
+    #centermass_0 = centermass_0 / float(plane_mass.sum())
 
-    plane_mass = ds['density'].sum(plane[0])
-    centermass_1 = 0
-    for i in plane_mass.coords[plane[1]]:
-        centermass_1 = centermass_1 + float(i) * float(plane_mass.loc[i])
-    centermass_1 = centermass_1 / float(plane_mass.sum())
+    # plane_mass = ds['density'].sum(plane[0])
+    # centermass_1 = 0
+    # for i in plane_mass.coords[plane[1]]:
+    #     centermass_1 = centermass_1 + float(i) * float(plane_mass.loc[i])
+    # centermass_1 = centermass_1 / float(plane_mass.sum())
 
-    ds['density'].attrs['center_of_mass'] = (centermass_0, centermass_1)
+    # ds['density'].attrs['center_of_mass'] = (centermass_0, centermass_1)
 
     return ds
 
