@@ -227,7 +227,7 @@ def aggregate_studies(studylist):
             min_x, min_y, min_z = min(min_x, pts.min()['x']), min(min_y, pts.min()['y']), min(min_z, pts.min()['z'])
     return synapses, (max_x, max_y, max_z), (min_x, min_y, min_z)
 
-def bin_synapses(synapses, smax, smin, nbins=10):
+def bin_synapses(studylist, nbins=10):
     """
     Compute the density of a set of synapses. Input is a dictionary with key: All, PairedBefore, PairedAfter, ....
     :param synapses:
@@ -238,29 +238,35 @@ def bin_synapses(synapses, smax, smin, nbins=10):
     :return:
     """
 
-    # Find the smallest range in x, y and z so we can figure out the bin sizes by dividing by the number of bins
-    binsize = min([smax[i] - smin[i] for i in range(3)]) / nbins
-    ds = xr.Dataset()
-    ds.attrs['binsize'] = binsize
-    for k,v in enumerate(synapses):
-        bins = {}
-        for idx, c in enumerate(['x', 'y', 'z']):
-            # The number of bins will be determined by the range on the access and the binsize
-            nbins = ceil((smax[idx] - smin[idx]) / binsize)
-            print(c, nbins)
-            # Now create an index that maps the coordinates into the bins
-            bins[c] = pd.cut(synapses[v][c],
-                             [smin[idx] + i * binsize for i in range(nbins + 1)],
-                             labels=[smin[idx] + i * binsize for i in range(nbins)],
-                             include_lowest=True)
+    binned_synapses = {}
+    agg_synapses, smax, smin = aggregate_studies(studylist)
 
-        # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
-        counts = synapses[v].groupby([bins['x'],bins['y'],bins['z']]).size()
+    # Go through the set of synapse study types (learner, nonlearner, ....)
+    for type, synapses in agg_synapses.items():
+        # Find the smallest range in x, y and z so we can figure out the bin sizes by dividing by the number of bins
+        binsize = min([smax[i] - smin[i] for i in range(3)]) / nbins
+        ds = xr.Dataset()
+        ds.attrs['binsize'] = binsize
+        for k,v in enumerate(synapses):
+            bins = {}
+            for idx, c in enumerate(['x', 'y', 'z']):
+                # The number of bins will be determined by the range on the access and the binsize
+                nbins = ceil((smax[idx] - smin[idx]) / binsize)
 
-        # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
-        # fill in the NaN that result from empty bins with 0.
-        ds[v + 'Counts'] = xr.DataArray(counts).unstack('dim_0').fillna(0)
-    return ds
+                # Now create an index that maps the coordinates into the bins
+                bins[c] = pd.cut(synapses[v][c],
+                                 [smin[idx] + i * binsize for i in range(nbins + 1)],
+                                 labels=[smin[idx] + i * binsize for i in range(nbins)],
+                                 include_lowest=True)
+
+            # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
+            counts = synapses[v].groupby([bins['x'],bins['y'],bins['z']]).size()
+
+            # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
+            # fill in the NaN that result from empty bins with 0.
+            ds[v + 'Counts'] = xr.DataArray(counts).unstack('dim_0').fillna(0)
+        binned_synapses[type] = ds
+    return binned_synapses
 
 def synapse_density(synapses, smax, smin, nbins=10, plane=None):
     """
