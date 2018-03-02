@@ -272,7 +272,7 @@ def bin_synapses(studylist, nbins=10):
     return binned_synapses
 
 
-def synapse_density(studylist, nbins=10, plane=None):
+def synapse_density(studylist, nbins=10, axis='y'):
     """
     Compute the density of a set of synapses. Input is a dictionary with key: All, PairedBefore, PairedAfter, ....
     :param synapses:
@@ -284,23 +284,27 @@ def synapse_density(studylist, nbins=10, plane=None):
     binned_synapses = bin_synapses(studylist, nbins)
 
     # Set the plane that we want to calculate density over.
-    if not plane:
-        plane = ['x', 'z']
+    if axis == 'y':
+        c0,c1  = 'x', 'z'
+    elif axis == 'x':
+        c0,c1 = 'y','z'
+    else
+        c0, c1 = 'x', 'y'
 
     density = {}
     for t, counts in binned_synapses.items():
         # Now collapse in one dimension:
-        counts2d = counts.sum('y')
+        counts2d = counts.sum(axis)
 
          # Calculate denstity by normalizing by the total number of synapses in each bin.
         density[t] = (counts2d / counts2d['AllCounts']).fillna(0)
 
         # Now compute the center of mass
-        plane_mass = density[t].sum('x')
-        centermass_0 = (plane_mass.coords['z'] * plane_mass).sum() / plane_mass.sum()
+        plane_mass = density[t].sum(c0)
+        centermass_0 = (plane_mass.coords[c1] * plane_mass).sum() / plane_mass.sum()
 
-        plane_mass = density[t].sum('z')
-        centermass_1 = (plane_mass.coords['x'] * plane_mass).sum() / plane_mass.sum()
+        plane_mass = density[t].sum(c1)
+        centermass_1 = (plane_mass.coords[c0] * plane_mass).sum() / plane_mass.sum()
 
         for k in centermass_0.data_vars:
             density[t][k].attrs['center_of_mass'] = (float(centermass_0[k]), float(centermass_1[k]))
