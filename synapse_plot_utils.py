@@ -205,14 +205,15 @@ def aggregate_studies(studylist):
     r = min(studylist[0]['AlignedUnpairedBefore'])
 
     study_types = {s['Type'] for s in studylist}
+    # Add a pseudo type which is for all studies.
     study_types.add('all')
 
     # Initialize resulting synapse dictionary so we have an entry for each study type.
     synapses = {t: {'All': pd.DataFrame(columns=['x', 'y', 'z']),
-                     'PairedBefore': pd.DataFrame(columns=['x', 'y', 'z']),
-                     'PairedAfter': pd.DataFrame(columns=['x', 'y', 'z']),
-                     'UnpairedBefore': pd.DataFrame(columns=['x', 'y', 'z']),
-                     'UnpairedAfter': pd.DataFrame(columns=['x', 'y', 'z'])}
+                    'PairedBefore': pd.DataFrame(columns=['x', 'y', 'z']),
+                    'PairedAfter': pd.DataFrame(columns=['x', 'y', 'z']),
+                    'UnpairedBefore': pd.DataFrame(columns=['x', 'y', 'z']),
+                    'UnpairedAfter': pd.DataFrame(columns=['x', 'y', 'z'])}
                 for t in study_types
                 }
     max_x, max_y, max_z = -float('inf'), -float('inf'), -float('inf')
@@ -220,21 +221,22 @@ def aggregate_studies(studylist):
     for s in studylist:
         for i in ['UnpairedBefore', 'UnpairedAfter', 'PairedBefore']:
             pts = s['Aligned' + i][r]['Data']
+            # Accumulate points for all studies
             synapses['all'][i] = synapses['all'][i].append(pts, ignore_index=True)
+            synapses['all']['All'] = synapses['all']['All'].append(pts, ignore_index=True)
+            # Accumulate for studys by type...
             synapses[s['Type']][i] = synapses[s['Type']][i].append(pts, ignore_index=True)
             synapses[s['Type']]['All'] = synapses[s['Type']]['All'].append(pts, ignore_index=True)
             max_x, max_y, max_z = max(max_x, pts.max()['x']), max(max_y, pts.max()['y']), max(max_z, pts.max()['z'])
             min_x, min_y, min_z = min(min_x, pts.min()['x']), min(min_y, pts.min()['y']), min(min_z, pts.min()['z'])
     return synapses, (max_x, max_y, max_z), (min_x, min_y, min_z)
 
+
 def bin_synapses(studylist, nbins=10):
     """
     Compute the density of a set of synapses. Input is a dictionary with key: All, PairedBefore, PairedAfter, ....
-    :param synapses:
-    :param smax: upper right corner of bounding box
-    :param smin: lower left corner of bounding box
-    :param nbins:
-    :param plane:
+    :param studylist:
+    :param nbins
     :return:
     """
 
@@ -260,7 +262,7 @@ def bin_synapses(studylist, nbins=10):
                                  include_lowest=True)
 
             # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
-            counts = synapses[v].groupby([bins['x'],bins['y'],bins['z']]).size()
+            counts = synapses[v].groupby([bins['x'], bins['y'], bins['z']]).size()
 
             # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
             # fill in the NaN that result from empty bins with 0.
@@ -283,43 +285,29 @@ def synapse_density(synapses, smax, smin, nbins=10, plane=None):
     if not plane:
         plane = ['x', 'z']
 
-    # Find the smallest range in x, y and z so we can figure out the bin sizes by dividing by the number of bins
-    binsize = min([smax[i] - smin[i] for i in range(3)]) / nbins
-    ds = xr.Dataset()
-    ds.attrs['binsize'] = binsize
-    for k,v in enumerate(synapses):
-        bins = {}
-        for idx, c in enumerate(['x', 'y', 'z']):
-            # The number of bins will be determined by the range on the access and the binsize
-            nbins = ceil((smax[idx] - smin[idx]) / binsize)
-            # Now create an index that maps the coordinates into the bins
-            bins[c] = pd.cut(synapses[v][c],
-                             [smin[idx] + i * binsize for i in range(nbins + 1)],
-                             labels=[smin[idx] + i * binsize for i in range(nbins)],
-                             include_lowest=True)
+    # Now collapse in one dimension:
+    counts2d = {k: counts[k].sum('y') for k in counts}
 
-        # Compute the number of synapses in the binned plane by grouping in the axis and counting them.
+    # Calculate denstity by normalizing by the total number of synapses in each bin.
+    density = (counts2d['learner'] / counts2d['learner']['AllCounts']).fillna(0)
+
+    # Now compute the center of mass
+    plane_mass = density.sum('x')
+    centermass_0 = (plane_mass.coords['z'] * plane_mass).sum() / plane_mass.sum()
+
+    plane_mass = density.sum('z')
+    centermass_1 = (plane_mass.coords['x'] * plane_mass).sum() / plane_mass.sum()
+
+    for k in centermass_0.data_vars:
+        ds['density'].attrs['center_of_mass'] = (float(centermass_0[k]), float(centermass_1[k]))
+
+    centermass = {k: (float(centermass_0[k]), float(centermass_1[k])) for k in centermass_0.data_vars}
+
+        # Compute the number synapses in the binned plane by grouping in the axis and counting them.
         counts = synapses[v].groupby([bins['x'],bins['y'],bins['z']]).size()
-
-        # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
-        # fill in the NaN that result from empty bins with 0.
-        ds[v + 'Counts'] = xr.DataArray(counts).unstack('dim_0').fillna(0)
     # Now add another array for density.
     #  ds['density'] = ds['counts'] / ds['counts'].sum()
-
-    # Now compute the center of mass and add this as an attribute
-    # plane_mass = ds['density'].sum(plane[1])
-    # centermass_0 = 0
-    #   centermass_0 = centermass_0 + float(i) * float(plane_mass.loc[i])
-    #centermass_0 = centermass_0 / float(plane_mass.sum())
-
-    # plane_mass = ds['density'].sum(plane[0])
-    # centermass_1 = 0
-    # for i in plane_mass.coords[plane[1]]:
-    #     centermass_1 = centermass_1 + float(i) * float(plane_mass.loc[i])
-    # centermass_1 = centermass_1 / float(plane_mass.sum())
-
-    # ds['density'].attrs['center_of_mass'] = (centermass_0, centermass_1)
+   ds['density'].attrs['center_of_mass'] = (centermass_0, centermass_1)
 
     return ds
 
