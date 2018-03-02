@@ -71,6 +71,7 @@ def get_studies(studyid):
              'Provenence': {'GITHash': githash, 'CatlogVersion': ermrest_snapshot}
              }
 
+
 # Helpful list....
 pair_types = ['PairedBefore', 'PairedAfter',
               'UnpairedBefore', 'UnpairedAfter',
@@ -249,7 +250,7 @@ def bin_synapses(studylist, nbins=10):
         binsize = min([smax[i] - smin[i] for i in range(3)]) / nbins
         ds = xr.Dataset()
         ds.attrs['binsize'] = binsize
-        for k,v in enumerate(synapses):
+        for k, v in enumerate(synapses):
             bins = {}
             for idx, c in enumerate(['x', 'y', 'z']):
                 # The number of bins will be determined by the range on the access and the binsize
@@ -270,46 +271,40 @@ def bin_synapses(studylist, nbins=10):
         binned_synapses[type] = ds
     return binned_synapses
 
-def synapse_density(synapses, smax, smin, nbins=10, plane=None):
+
+def synapse_density(studylist, nbins=10, plane=None):
     """
     Compute the density of a set of synapses. Input is a dictionary with key: All, PairedBefore, PairedAfter, ....
     :param synapses:
-    :param smax: upper right corner of bounding box
-    :param smin: lower left corner of bounding box
     :param nbins:
     :param plane:
     :return:
     """
 
+    binned_synapses = bin_synapses(studylist, nbins)
+
     # Set the plane that we want to calculate density over.
     if not plane:
         plane = ['x', 'z']
 
-    # Now collapse in one dimension:
-    counts2d = {k: counts[k].sum('y') for k in counts}
+    density = {}
+    for t, counts in binned_synapses.items():
+        # Now collapse in one dimension:
+        counts2d = counts.sum('y')
 
-    # Calculate denstity by normalizing by the total number of synapses in each bin.
-    density = (counts2d['learner'] / counts2d['learner']['AllCounts']).fillna(0)
+         # Calculate denstity by normalizing by the total number of synapses in each bin.
+        density[t] = (counts2d / counts2d['AllCounts']).fillna(0)
 
-    # Now compute the center of mass
-    plane_mass = density.sum('x')
-    centermass_0 = (plane_mass.coords['z'] * plane_mass).sum() / plane_mass.sum()
+        # Now compute the center of mass
+        plane_mass = density[t].sum('x')
+        centermass_0 = (plane_mass.coords['z'] * plane_mass).sum() / plane_mass.sum()
 
-    plane_mass = density.sum('z')
-    centermass_1 = (plane_mass.coords['x'] * plane_mass).sum() / plane_mass.sum()
+        plane_mass = density[t].sum('z')
+        centermass_1 = (plane_mass.coords['x'] * plane_mass).sum() / plane_mass.sum()
 
-    for k in centermass_0.data_vars:
-        ds['density'].attrs['center_of_mass'] = (float(centermass_0[k]), float(centermass_1[k]))
-
-    centermass = {k: (float(centermass_0[k]), float(centermass_1[k])) for k in centermass_0.data_vars}
-
-        # Compute the number synapses in the binned plane by grouping in the axis and counting them.
-        counts = synapses[v].groupby([bins['x'],bins['y'],bins['z']]).size()
-    # Now add another array for density.
-    #  ds['density'] = ds['counts'] / ds['counts'].sum()
-   ds['density'].attrs['center_of_mass'] = (centermass_0, centermass_1)
-
-    return ds
+        for k in centermass_0.data_vars:
+            density[t][k].attrs['center_of_mass'] = (float(centermass_0[k]), float(centermass_1[k]))
+    return density
 
 
 def dump_studies(sset, fname):
