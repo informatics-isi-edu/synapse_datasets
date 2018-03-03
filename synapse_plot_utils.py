@@ -254,7 +254,7 @@ def bin_synapses(studylist, nbins=10):
             bins = {}
             for idx, c in enumerate(['x', 'y', 'z']):
                 # The number of bins will be determined by the range on the access and the binsize
-                nbins = ceil((smax[idx] - smin[idx]) / binsize)
+                nbins = int(ceil((smax[idx] - smin[idx]) / binsize))
 
                 # Now create an index that maps the coordinates into the bins
                 bins[c] = pd.cut(synapses[v][c],
@@ -275,9 +275,9 @@ def bin_synapses(studylist, nbins=10):
 def synapse_density(studylist, nbins=10, axis='y'):
     """
     Compute the density of a set of synapses. Input is a dictionary with key: All, PairedBefore, PairedAfter, ....
-    :param synapses:
+    :param studylist:
     :param nbins:
-    :param plane:
+    :param axis:
     :return:
     """
 
@@ -285,10 +285,10 @@ def synapse_density(studylist, nbins=10, axis='y'):
 
     # Set the plane that we want to calculate density over.
     if axis == 'y':
-        c0,c1  = 'x', 'z'
+        c0, c1 = 'x', 'z'
     elif axis == 'x':
-        c0,c1 = 'y','z'
-    else
+        c0, c1 = 'y', 'z'
+    else:
         c0, c1 = 'x', 'y'
 
     density = {}
@@ -298,6 +298,8 @@ def synapse_density(studylist, nbins=10, axis='y'):
 
          # Calculate denstity by normalizing by the total number of synapses in each bin.
         density[t] = (counts2d / counts2d['AllCounts']).fillna(0)
+        # Data variable are Density, not Counts now....
+        density[t].rename({ k : k.replace('Counts', 'Density') for k in counts.data_vars}, inplace=True)
 
         # Now compute the center of mass
         plane_mass = density[t].sum(c0)
