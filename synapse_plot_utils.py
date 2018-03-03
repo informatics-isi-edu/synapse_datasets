@@ -250,6 +250,9 @@ def bin_synapses(studylist, nbins=10):
         binsize = min([smax[i] - smin[i] for i in range(3)]) / nbins
         ds = xr.Dataset()
         ds.attrs['binsize'] = binsize
+        ds.attrs['min'] = smin
+        ds.attrs['max'] = smax
+        ds.attrs['type'] = 'count'
         for k, v in enumerate(synapses):
             bins = {}
             for idx, c in enumerate(['x', 'y', 'z']):
@@ -267,7 +270,7 @@ def bin_synapses(studylist, nbins=10):
 
             # Convert the panda to a dataset, unpack the multi-index to get X,Y dimensions, and then finally,
             # fill in the NaN that result from empty bins with 0.
-            ds[v + 'Counts'] = xr.DataArray(counts).unstack('dim_0').fillna(0)
+            ds[v] = xr.DataArray(counts).unstack('dim_0').fillna(0)
         binned_synapses[type] = ds
     return binned_synapses
 
@@ -296,10 +299,10 @@ def synapse_density(studylist, nbins=10, axis='y'):
         # Now collapse in one dimension:
         counts2d = counts.sum(axis)
 
-         # Calculate denstity by normalizing by the total number of synapses in each bin.
-        density[t] = (counts2d / counts2d['AllCounts']).fillna(0)
-        # Data variable are Density, not Counts now....
-        density[t].rename({ k : k.replace('Counts', 'Density') for k in counts.data_vars}, inplace=True)
+        # Calculate denstity by normalizing by the total number of synapses in each bin.
+        density[t] = (counts2d / counts2d['All']).fillna(0)
+        density[t].attrs = counts.attrs
+        density[t].attrs['type'] = 'density'
 
         # Now compute the center of mass
         plane_mass = density[t].sum(c0)
