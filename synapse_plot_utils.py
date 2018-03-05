@@ -275,7 +275,7 @@ def bin_synapses(studylist, nbins=10):
     return binned_synapses
 
 
-def synapse_density(studylist, nbins=10, axis='y'):
+def synapse_density(studylist, nbins=10, axis='y', mode='bin'):
     """
     Compute the density of a set of synapses. Input is a dictionary with key: All, PairedBefore, PairedAfter, ....
     :param studylist:
@@ -298,9 +298,15 @@ def synapse_density(studylist, nbins=10, axis='y'):
     for t, counts in binned_synapses.items():
         # Now collapse in one dimension:
         counts2d = counts.sum(axis)
-
-        # Calculate denstity by normalizing by the total number of synapses in each bin.
-        density[t] = (counts2d / counts2d['All']).fillna(0)
+        if mode == 'bin':
+            # Calculate denstity by normalizing by the total number of synapses in each bin.
+            density[t] = (counts2d / counts2d['All']).fillna(0)
+        elif mode == 'total':
+            # Normalize by the total number of synapses.
+            density[t] = (counts2d / counts2d['All'].sum()).fillna(0)
+        else: #mode = density
+            # Use the number of synapes in each type
+            density[t] = (counts2d / counts.sum()).fillna(0)
         density[t].attrs = counts.attrs
         density[t].attrs['type'] = 'density'
 
