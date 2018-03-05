@@ -288,7 +288,7 @@ def synapse_density(studylist, nbins=10, axis='y', mode='bin'):
 
     # Set the plane that we want to calculate density over.
     if axis == 'y':
-        c0, c1 = 'x', 'z'
+        c0, c1 = 'z', 'x'
     elif axis == 'x':
         c0, c1 = 'y', 'z'
     else:
