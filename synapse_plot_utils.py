@@ -213,6 +213,8 @@ def aggregate_studies(studylist):
 
     # Initialize resulting synapse dictionary so we have an entry for each study type.
     synapses = {t: {'All': pd.DataFrame(columns=['x', 'y', 'z']),
+                    'Before': pd.DataFrame(columns=['x', 'y', 'z']),
+                    'After': pd.DataFrame(columns=['x', 'y', 'z']),
                     'PairedBefore': pd.DataFrame(columns=['x', 'y', 'z']),
                     'PairedAfter': pd.DataFrame(columns=['x', 'y', 'z']),
                     'UnpairedBefore': pd.DataFrame(columns=['x', 'y', 'z']),
@@ -222,7 +224,7 @@ def aggregate_studies(studylist):
     max_x, max_y, max_z = -float('inf'), -float('inf'), -float('inf')
     min_x, min_y, min_z = float('inf'), float('inf'), float('inf')
     for s in studylist:
-        for i in ['UnpairedBefore', 'UnpairedAfter', 'PairedBefore']:
+        for i in ['UnpairedBefore', 'UnpairedAfter', 'PairedBefore', 'PairedAfter']:
             pts = s['Aligned' + i][r]['Data']
             # Accumulate points for all studies
             synapses['all'][i] = synapses['all'][i].append(pts, ignore_index=True)
@@ -232,8 +234,12 @@ def aggregate_studies(studylist):
             synapses[s['Type']]['All'] = synapses[s['Type']]['All'].append(pts, ignore_index=True)
             max_x, max_y, max_z = max(max_x, pts.max()['x']), max(max_y, pts.max()['y']), max(max_z, pts.max()['z'])
             min_x, min_y, min_z = min(min_x, pts.min()['x']), min(min_y, pts.min()['y']), min(min_z, pts.min()['z'])
-        synapses[s['Type']]['UnpairedBefore'] = synapses[s['Type']]['UnpairedBefore'].append(synapses[s['Type']]['PairedBefore'])
-        synapses[s['Type']]['UnpairedAfter'] = synapses[s['Type']]['UnpairedAfter'].append(synapses[s['Type']]['PairedAfter'])
+        synapses[s['Type']]['Before'] = synapses[s['Type']]['Before'].\
+            append(synapses[s['Type']]['UnpairedBefore']).\
+            append(synapses[s['Type']]['PairedBefore'])
+        synapses[s['Type']]['After'] = synapses[s['Type']]['After'].\
+            append(synapses[s['Type']]['UnpairedAfter']).\
+            append(synapses[s['Type']]['PairedAfter'])
     return synapses, (max_x, max_y, max_z), (min_x, min_y, min_z)
 
 
@@ -279,7 +285,7 @@ def bin_synapses(studylist, nbins=10):
     return binned_synapses
 
 
-def synapse_density(studylist, nbins=10, axis='y', mode='bin'):
+def synapse_density(binned_synapses, axis='y', mode='bin'):
     """
     Compute the density of a set of synapses. Input is a dictionary with key: All, PairedBefore, PairedAfter, ....
     :param studylist:
@@ -287,8 +293,6 @@ def synapse_density(studylist, nbins=10, axis='y', mode='bin'):
     :param axis:
     :return:
     """
-
-    binned_synapses = bin_synapses(studylist, nbins)
 
     # Set the plane that we want to calculate density over.
     if axis == 'y':
@@ -307,6 +311,8 @@ def synapse_density(studylist, nbins=10, axis='y', mode='bin'):
         # Now collapse in one dimension:
         counts2d = counts.sum(axis).transpose()
         if mode == 'test':
+            counts['Before'] - counts['After']
+            ]
             density[t] = xr.Dataset()
             density[t]['UnpairedBefore'] = (counts2d['UnpairedBefore'] / (counts2d['UnpairedBefore'] + counts2d['PairedBefore'])).fillna(0)
             density[t]['UnpairedAfter'] = (counts2d['UnpairedAfter'] / (counts2d['UnpairedAfter'] + counts2d['PairedBefore'])).fillna(0)
