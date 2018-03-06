@@ -73,8 +73,10 @@ def get_studies(studyid):
 
 
 # Helpful list....
-pair_types = ['PairedBefore', 'PairedAfter',
+pair_types = ['Before', 'After',
+              'PairedBefore', 'PairedAfter',
               'UnpairedBefore', 'UnpairedAfter',
+              'AlignedBefore', 'AlignedAfter'
               'AlignedPairedBefore', 'AlignedPairedAfter',
               'AlignedUnpairedBefore', 'AlignedUnpairedAfter']
 
@@ -230,6 +232,8 @@ def aggregate_studies(studylist):
             synapses[s['Type']]['All'] = synapses[s['Type']]['All'].append(pts, ignore_index=True)
             max_x, max_y, max_z = max(max_x, pts.max()['x']), max(max_y, pts.max()['y']), max(max_z, pts.max()['z'])
             min_x, min_y, min_z = min(min_x, pts.min()['x']), min(min_y, pts.min()['y']), min(min_z, pts.min()['z'])
+        synapses[s['Type']]['UnpairedBefore'] = synapses[s['Type']]['UnpairedBefore'].append(synapses[s['Type']]['PairedBefore'])
+        synapses[s['Type']]['UnpairedAfter'] = synapses[s['Type']]['UnpairedAfter'].append(synapses[s['Type']]['PairedAfter'])
     return synapses, (max_x, max_y, max_z), (min_x, min_y, min_z)
 
 
@@ -295,12 +299,21 @@ def synapse_density(studylist, nbins=10, axis='y', mode='bin'):
         c0, c1 = 'x', 'y'
 
     density = {}
+    # Go through the study types: learner, nonlearner, ...
     for t, counts in binned_synapses.items():
+        tmp = counts['UnpairedBefore']
+        counts['UnpairedBefore'] = counts['UnpairedBefore'] - counts['UnpairedAfter']
+        counts['UnpairedAfter'] = counts['UnpairedAfter'] - tmp
         # Now collapse in one dimension:
-        counts2d = counts.sum(axis)
+        counts2d = counts.sum(axis).transpose()
+        if mode == 'test':
+            density[t] = xr.Dataset()
+            density[t]['UnpairedBefore'] = (counts2d['UnpairedBefore'] / (counts2d['UnpairedBefore'] + counts2d['PairedBefore'])).fillna(0)
+            density[t]['UnpairedAfter'] = (counts2d['UnpairedAfter'] / (counts2d['UnpairedAfter'] + counts2d['PairedBefore'])).fillna(0)
+            density[t]['PairedBefore'] = (counts2d['PairedBefore']/(counts2d['PairedBefore'])).fillna(0)
         if mode == 'bin':
             # Calculate denstity by normalizing by the total number of synapses in each bin.
-            density[t] = (counts2d / counts2d['All']).fillna(0)
+           density[t] = (counts2d / counts2d['All']).fillna(0)
         elif mode == 'total':
             # Normalize by the total number of synapses.
             density[t] = (counts2d / counts2d['All'].sum()).fillna(0)
