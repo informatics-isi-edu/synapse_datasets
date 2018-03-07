@@ -305,26 +305,18 @@ def synapse_density(binned_synapses, axis='y', mode='bin'):
     density = {}
     # Go through the study types: learner, nonlearner, ...
     for t, counts in binned_synapses.items():
-        tmp = counts['UnpairedBefore']
-        counts['UnpairedBefore'] = counts['UnpairedBefore'] - counts['UnpairedAfter']
-        counts['UnpairedAfter'] = counts['UnpairedAfter'] - tmp
         # Now collapse in one dimension:
         counts2d = counts.sum(axis).transpose()
-        if mode == 'test':
-            counts['Before'] - counts['After']
-            ]
-            density[t] = xr.Dataset()
-            density[t]['UnpairedBefore'] = (counts2d['UnpairedBefore'] / (counts2d['UnpairedBefore'] + counts2d['PairedBefore'])).fillna(0)
-            density[t]['UnpairedAfter'] = (counts2d['UnpairedAfter'] / (counts2d['UnpairedAfter'] + counts2d['PairedBefore'])).fillna(0)
-            density[t]['PairedBefore'] = (counts2d['PairedBefore']/(counts2d['PairedBefore'])).fillna(0)
         if mode == 'bin':
             # Calculate denstity by normalizing by the total number of synapses in each bin.
            density[t] = (counts2d / counts2d['All']).fillna(0)
         elif mode == 'total':
-            # Normalize by the total number of synapses.
+            print(counts2d['All'].sum())
+            # Normalize by the total number of synapses .
             density[t] = (counts2d / counts2d['All'].sum()).fillna(0)
         else: #mode = density
             # Use the number of synapes in each type
+            print(counts.sum())
             density[t] = (counts2d / counts.sum()).fillna(0)
         density[t].attrs = counts.attrs
         density[t].attrs['type'] = 'density'
