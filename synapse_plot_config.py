@@ -401,3 +401,4 @@ def plot_synapses(studylist,
         layout['sliders'] = sliders
     fig = dict(data=data, layout=layout)
     return fig
+
