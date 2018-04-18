@@ -56,11 +56,15 @@ def get_studies(studyid):
             i['Alignment'] = ImageGrossAlignment.from_image_id(ermrest_catalog, i['BeforeImageID'])
             p = pd.DataFrame([i[pt] for pt in ['AlignP0', 'AlignP1', 'AlignP2']])
             p = p.multiply(pd.DataFrame([{'z': 0.4, 'y': 0.26, 'x': 0.26}]*3))
-            i['StudyAlignmentPts'] = pd.DataFrame(transform_points(i['Alignment'].M, p.loc[:,['x','y','z']]),
-                                                 columns=['x', 'y', 'z'])
+
+            i['StudyAlignmentPts'] = pd.DataFrame(transform_points(i['Alignment'].M_canonical, p.loc[:,['x','y','z']]),
+                                                  columns=['x', 'y', 'z'])
+#            i['StudyAlignmentPts'] = pd.DataFrame(transform_points(i['Alignment'].M, p.loc[:,['x','y','z']]),
+#                                                columns=['x', 'y', 'z'])
             i['Aligned'] = True
             i['AlignmentPts'] = dict()
         except ValueError:  # Alignments missing....
+            print('Alingment missing for study: {0}'.format(i['Study']))
             continue
         except NotImplementedError:
             print('Alignment Code Failed for study: {0}'.format(i['Study']))
@@ -171,7 +175,7 @@ def compute_pairs(studylist, radii, ratio=None, maxratio=None):
                 image_obj = s['Alignment']
                 s['AlignmentPts'][r] = {'Data': s['StudyAlignmentPts']}
                 for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter']:
-                    p = pd.DataFrame(transform_points(image_obj.M, s[ptype][r]['Data'].loc[:, ['x', 'y', 'z']]),
+                    p = pd.DataFrame(transform_points(image_obj.M_canonical, s[ptype][r]['Data'].loc[:, ['x', 'y', 'z']]),
                                      columns=['x', 'y', 'z'])
                     p['core'] = s[ptype][r]['Data']['core']
 
