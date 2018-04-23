@@ -362,18 +362,19 @@ def synapse_density3d(binned_synapses, threshold=0):
         density[t].attrs['type'] = 'density'
 
         # Now compute the center of mass
-        plane_mass = density[t].sum(['y','z'])
+        plane_mass = density[t].sum(['y']).sum(['z'])
         centermass_x = (plane_mass.coords['x'] * plane_mass).sum() / plane_mass.sum()
 
-        plane_mass = density[t].sum(['x','z'])
+        plane_mass = density[t].sum(['x']).sum(['z'])
         centermass_y = (plane_mass.coords['y'] * plane_mass).sum() / plane_mass.sum()
 
-        plane_mass = density[t].sum(['x','y'])
+        plane_mass = density[t].sum(['x']).sum(['y'])
         centermass_z = (plane_mass.coords['z'] * plane_mass).sum() / plane_mass.sum()
 
         for k in centermass_x.data_vars:
             density[t][k].attrs['center_of_mass'] = \
                 (float(centermass_x[k]), float(centermass_y[k]), float(centermass_z[k]))
+            print(t, k, density[t][k].attrs['center_of_mass'])
     return density
 
 
