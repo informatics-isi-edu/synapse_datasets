@@ -317,16 +317,16 @@ def synapse_density(binned_synapses, axis='y', mode='density', threshold=0):
         elif mode == 'total':
             # Normalize by the total number of synapses .
             density[t] = (counts2d / counts2d['All'].sum()).fillna(0)
-        else: #mode = density
+        else: # mode = density:
             # Use the number of synapes in each type
             density[t] = (counts2d / counts.sum()).fillna(0)
 
         dmax = density[t].max()*threshold
         density[t] = density[t].where(density[t] > dmax, 0)
 
-
         density[t].attrs = counts.attrs
         density[t].attrs['type'] = 'density'
+
 
         # Now compute the center of mass
         plane_mass = density[t].sum(c0)
@@ -337,6 +337,43 @@ def synapse_density(binned_synapses, axis='y', mode='density', threshold=0):
 
         for k in centermass_0.data_vars:
             density[t][k].attrs['center_of_mass'] = (float(centermass_0[k]), float(centermass_1[k]))
+    return density
+
+
+def synapse_density3d(binned_synapses, threshold=0):
+    """
+    Compute the density of a set of synapses. Input is a dictionary with key: All, PairedBefore, PairedAfter, ....
+    :param studylist:
+    :param nbins:
+    :param axis:
+    :return:
+    """
+
+    density = {}
+    # Go through the study types: learner, nonlearner, ...
+    for t, counts in binned_synapses.items():
+        # Use the number of synapes in each type
+        density[t] = (counts / counts.sum()).fillna(0)
+
+        dmax = density[t].max() * threshold
+        density[t] = density[t].where(density[t] > dmax, 0)
+
+        density[t].attrs = counts.attrs
+        density[t].attrs['type'] = 'density'
+
+        # Now compute the center of mass
+        plane_mass = density[t].sum(['y','z'])
+        centermass_x = (plane_mass.coords['x'] * plane_mass).sum() / plane_mass.sum()
+
+        plane_mass = density[t].sum(['x','z'])
+        centermass_y = (plane_mass.coords['y'] * plane_mass).sum() / plane_mass.sum()
+
+        plane_mass = density[t].sum(['x','y'])
+        centermass_z = (plane_mass.coords['z'] * plane_mass).sum() / plane_mass.sum()
+
+        for k in centermass_x.data_vars:
+            density[t][k].attrs['center_of_mass'] = \
+                (float(centermass_x[k]), float(centermass_y[k]), float(centermass_z[k]))
     return density
 
 

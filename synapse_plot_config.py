@@ -216,7 +216,8 @@ def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipa
                                     label='Before', method='update'))
             button_list.append(dict(args=[{'visible': smask['after']}, {'title' : title + l + ' After'}],
                                     label='After', method='update'))
-            button_list.append(dict(args=[{'visible': smask['paired']}, {'title' : title + l + ' Paired'}],
+            if 'paired' in smask:
+                button_list.append(dict(args=[{'visible': smask['paired']}, {'title' : title + l + ' Paired'}],
                                     label='Paired', method='update'))
             updatemenus.append(
                 dict(buttons=button_list, direction='left', showactive=False, type='buttons',
@@ -235,7 +236,8 @@ def step_buttons(plotmode, masks, study_types, step=None, showlegend=True, skipa
                                         label='Before', method='update'))
             control_buttons.append(dict(args=[{'visible': smask['after']}, {'title' : title + l + ' All'}],
                                         label='After', method='update'))
-            control_buttons.append(dict(args=[{'visible': smask['paired']}, {'title' : title + l + ' All'}],
+            if 'paired' in smask:
+               control_buttons.append(dict(args=[{'visible': smask['paired']}, {'title' : title + l + ' All'}],
                                         label='Paired', method='update'))
    #         updatemenus.append(
    #             dict(buttons=control_buttons, direction='left', showactive=False, type='buttons',
