@@ -236,14 +236,12 @@ def aggregate_studies(studylist):
             # Accumulate for studys by type...
             synapses[s['Type']][i] = synapses[s['Type']][i].append(pts, ignore_index=True)
             synapses[s['Type']]['All'] = synapses[s['Type']]['All'].append(pts, ignore_index=True)
+            if 'Before' in i:
+                synapses[s['Type']]['Before'] = synapses[s['Type']]['Before'].append(pts, ignore_index=True)
+            else:
+                synapses[s['Type']]['After'] = synapses[s['Type']]['After'].append(pts, ignore_index=True)
             max_x, max_y, max_z = max(max_x, pts.max()['x']), max(max_y, pts.max()['y']), max(max_z, pts.max()['z'])
             min_x, min_y, min_z = min(min_x, pts.min()['x']), min(min_y, pts.min()['y']), min(min_z, pts.min()['z'])
-        synapses[s['Type']]['Before'] = synapses[s['Type']]['Before'].\
-            append(synapses[s['Type']]['UnpairedBefore']).\
-            append(synapses[s['Type']]['PairedBefore'])
-        synapses[s['Type']]['After'] = synapses[s['Type']]['After'].\
-            append(synapses[s['Type']]['UnpairedAfter']).\
-            append(synapses[s['Type']]['PairedAfter'])
     return synapses, (max_x, max_y, max_z), (min_x, min_y, min_z)
 
 

@@ -98,7 +98,7 @@ def position_layout(minx, miny, minz, maxx, maxy, maxz):
                       range=[minz, maxz],
                        color='blue', ),
 
-            camera=dict(up=dict(x=0, y=0, z=1)),
+#            camera=dict(up=dict(x=0, y=0, z=1)),
             aspectmode='cube',
             domain=dict(y=[0,.9]),
         #    dragmode='turntable',
