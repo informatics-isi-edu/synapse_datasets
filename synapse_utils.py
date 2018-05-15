@@ -241,7 +241,7 @@ def get_synapse_studies(studyset, protocols=None):
     # Now lets go back an pick up the protocols which are associated with an image.
     # Each image has a protocol step, and from the step we can get the protocol.
     # Use the first image.
-    path = path.pair.link(zebrafish.Image.alias('image'), on=path.pair.columns['Image 1'] == zebrafish.Image.ID) \
+    path = path.pair.link(zebrafish.Image.alias('image'), on=path.pair.column_definitions['Image 1'] == zebrafish.Image.ID) \
         .link(synapse.tables['Protocol Step']) \
         .link(synapse.Protocol)
 
@@ -255,16 +255,16 @@ def get_synapse_studies(studyset, protocols=None):
     # Now that we have build up the path, we can retrieve the set of studies and associated values
     study_entities = path.study.entities(Study=path.study.ID,
                                          Subject=path.pair.Subject,
-                                         Region1=path.study.columns['Synaptic Region 1'],
-                                         Region2=path.study.columns['Synaptic Region 2'],
-                                         BeforeURL=path.study.columns['Region 1 URL'],
-                                         AfterURL=path.study.columns['Region 2 URL'],
-                                         BeforeImageID=path.pair.columns['Image 1'],
-                                         AfterImageID=path.pair.columns['Image 2'],
-                                         Learner=path.Behavior.columns['Learned?'],
-                                         AlignP0=path.image.columns['Align P0 ZYX'],
-                                         AlignP1=path.image.columns['Align P1 ZYX'],
-                                         AlignP2=path.image.columns['Align P2 ZYX'],
+                                         Region1=path.study.column_definitions['Synaptic Region 1'],
+                                         Region2=path.study.column_definitions['Synaptic Region 2'],
+                                         BeforeURL=path.study.column_definitions['Region 1 URL'],
+                                         AfterURL=path.study.column_definitions['Region 2 URL'],
+                                         BeforeImageID=path.pair.column_definitions['Image 1'],
+                                         AfterImageID=path.pair.column_definitions['Image 2'],
+                                         Learner=path.Behavior.column_definitions['Learned?'],
+                                         AlignP0=path.image.column_definitions['Align P0 ZYX'],
+                                         AlignP1=path.image.column_definitions['Align P1 ZYX'],
+                                         AlignP2=path.image.column_definitions['Align P2 ZYX'],
                                          Protocol=path.Protocol.ID )
 
     return study_entities
