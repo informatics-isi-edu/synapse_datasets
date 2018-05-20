@@ -231,15 +231,15 @@ def aggregate_studies(studylist):
         for i in ['UnpairedBefore', 'UnpairedAfter', 'PairedBefore', 'PairedAfter']:
             pts = s['Aligned' + i][r]['Data']
             # Accumulate points for all studies
-            synapses['all'][i] = synapses['all'][i].append(pts, ignore_index=True)
-            synapses['all']['All'] = synapses['all']['All'].append(pts, ignore_index=True)
+            synapses['all'][i] = synapses['all'][i].append(pts, ignore_index=True, sort=False)
+            synapses['all']['All'] = synapses['all']['All'].append(pts, ignore_index=True,sort=False)
             # Accumulate for studys by type...
-            synapses[s['Type']][i] = synapses[s['Type']][i].append(pts, ignore_index=True)
-            synapses[s['Type']]['All'] = synapses[s['Type']]['All'].append(pts, ignore_index=True)
+            synapses[s['Type']][i] = synapses[s['Type']][i].append(pts, ignore_index=True, sort=False)
+            synapses[s['Type']]['All'] = synapses[s['Type']]['All'].append(pts, ignore_index=True, sort=False)
             if 'Before' in i:
-                synapses[s['Type']]['Before'] = synapses[s['Type']]['Before'].append(pts, ignore_index=True)
+                synapses[s['Type']]['Before'] = synapses[s['Type']]['Before'].append(pts, ignore_index=True, sort=False)
             else:
-                synapses[s['Type']]['After'] = synapses[s['Type']]['After'].append(pts, ignore_index=True)
+                synapses[s['Type']]['After'] = synapses[s['Type']]['After'].append(pts, ignore_index=True, sort=False)
             max_x, max_y, max_z = max(max_x, pts.max()['x']), max(max_y, pts.max()['y']), max(max_z, pts.max()['z'])
             min_x, min_y, min_z = min(min_x, pts.min()['x']), min(min_y, pts.min()['y']), min(min_z, pts.min()['z'])
     return synapses, (max_x, max_y, max_z), (min_x, min_y, min_z)
