@@ -1,84 +1,8 @@
-import copy
-import pickle
-
 import pandas as pd
-import numpy as np
 import xarray as xr
 from math import floor, ceil
 
-import os
-import subprocess
-
-import synapse_utils
-from synspy.analyze.pair import SynapticPairStudy, ImageGrossAlignment, transform_points
-
-from deriva.core import HatracStore, ErmrestCatalog, ErmrestSnapshot, get_credential, DerivaPathError
-
 synapseserver = 'synapse-dev.isrd.isi.edu'
-
-def get_studies(studyid):
-
-    credential = get_credential(synapseserver)
-    if '@' in studyid:
-        ermrest_catalog = ErmrestSnapshot('https', synapseserver, 1, credential)
-    else:
-        ermrest_catalog = ErmrestCatalog('https', synapseserver, 1, credential)
-    hatrac_store = HatracStore('https', synapseserver, credentials=credential)
-
-    githash = git_version()
-    ermrest_snapshot = catalog_snapshot()
-
-# Get the current list of studies from the server.
-    study_entities = synapse_utils.get_synapse_studies(studyid)
-
-    print('Identified %d studies' % len(study_entities))
-
-    protocol_types = {
-        'PrcDsy20160101A': 'aversion',
-        'PrcDsy20170613A': 'conditioned-control',
-        'PrcDsy20170615A': 'unconditioned-control',
-        'PrcDsy20170613B': 'fullcycle-control',
-        'PrcDsy20171030A': 'groundtruth-control',
-        'PrcDsy20171030B': 'interval-groundtruth-control'
-    }
-
-    # Compute the alignment for each study, and fill in some useful values.
-    for i in study_entities:
-        i['Paired'] = False
-        if protocol_types[i['Protocol']] == 'aversion':
-            if i['Learner'] is True:
-                i['Type'] = 'learner'
-            else:
-                i['Type'] = 'nonlearner'
-        else:
-            i['Type'] = protocol_types[i['Protocol']]
-
-        try:
-            i['Aligned'] = False
-            i['Provenence'] = {'GITHash': githash, 'CatlogVersion': ermrest_snapshot}
-            i['StudyID'] = studyid
-            i['Alignment'] = ImageGrossAlignment.from_image_id(ermrest_catalog, i['BeforeImageID'])
-            p = pd.DataFrame([i[pt] for pt in ['AlignP0', 'AlignP1', 'AlignP2']])
-            p = p.multiply(pd.DataFrame([{'z': 0.4, 'y': 0.26, 'x': 0.26}]*3))
-
-            i['StudyAlignmentPts'] = pd.DataFrame(transform_points(i['Alignment'].M_canonical, p.loc[:,['x','y','z']]),
-                                                  columns=['x', 'y', 'z'])
-#            i['StudyAlignmentPts'] = pd.DataFrame(transform_points(i['Alignment'].M, p.loc[:,['x','y','z']]),
-#                                                columns=['x', 'y', 'z'])
-            i['Aligned'] = True
-            i['AlignmentPts'] = dict()
-        except ValueError:  # Alignments missing....
-            print('Alingment missing for study: {0}'.format(i['Study']))
-            continue
-        except NotImplementedError:
-            print('Alignment Code Failed for study: {0}'.format(i['Study']))
-            continue
-
-    return { 'StudyID': studyid,
-             'Studies': list(study_entities),
-             'Provenence': {'GITHash': githash, 'CatlogVersion': ermrest_snapshot}
-             }
-
 
 # Helpful list....
 pair_types = ['Before', 'After',
@@ -87,23 +11,6 @@ pair_types = ['Before', 'After',
               'AlignedBefore', 'AlignedAfter'
               'AlignedPairedBefore', 'AlignedPairedAfter',
               'AlignedUnpairedBefore', 'AlignedUnpairedAfter']
-
-
-def group_studies(studies, group='Type'):
-    """
-    Return a dictionary whose key it a type, subject, or alignment and whose value is a list of studies
-    """
-    if group == 'Type':
-        key = 'Type'
-    if group == 'Subject':
-        key = 'Subject'
-    if group == 'Aligned':
-        key = 'Aligned'
-    g = dict()
-    for i in studies:
-        g[i[key]] = g.get(i[key], []) + [i]
-    return g
-
 
 def aggregate_studies(studylist):
     """
@@ -279,48 +186,3 @@ def synapse_density3d(binned_synapses, threshold=0):
     return density
 
 
-def dump_studies(sset, fname):
-    with open(fname, 'wb') as fo:
-        pickle.dump(sset, fo)
-        print('dumped {0} studies to {1}'.format(len(sset['Studies']), fname))
-
-
-def restore_studies(fname):
-    with open(fname, 'rb') as fo:
-        slist = pickle.load(fo)
-
-    print('Restored {0} studies'.format(len(slist['Studies'])))
-    return slist
-
-
-# Return the git revision as a string
-def git_version():
-    def _minimal_ext_cmd(cmd):
-        # construct minimal environment
-        env = {}
-        for k in ['SYSTEMROOT', 'PATH']:
-            v = os.environ.get(k)
-            if v is not None:
-                env[k] = v
-        # LANGUAGE is used on win32
-        env['LANGUAGE'] = 'C'
-        env['LANG'] = 'C'
-        env['LC_ALL'] = 'C'
-        out = subprocess.Popen(cmd, stdout = subprocess.PIPE, env=env).communicate()[0]
-        return out
-
-    try:
-        out = _minimal_ext_cmd(['git', 'rev-parse', 'HEAD'])
-        GIT_REVISION = out.strip().decode('ascii')
-    except OSError:
-        GIT_REVISION = "Unknown"
-
-    return GIT_REVISION
-
-
-def catalog_snapshot():
-        credential = get_credential(synapseserver)
-        catalog = ErmrestCatalog('https', synapseserver, 1, credential)
-        # Get current version of catalog and construct a new URL that fully qualifies catalog with version.
-        version = catalog.get('/').json()['snaptime']
-        return version

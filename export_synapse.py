@@ -3,7 +3,6 @@ import synapse_plot_utils as sp
 from synapse_plot_config import plot_synapses, trace_color, position_layout, step_buttons, studytypes
 
 from deriva.core import ErmrestCatalog, get_credential
-import deriva.core.versioned_catalog as vc
 
 protocol_types = {
     'PrcDsy20160101A': 'aversion',
@@ -18,15 +17,11 @@ bag_metadata = {
     'External-Description': 'Synapse Pair Datasets',
 }
 
-destdir = '/Users/carl/Desktop'
 studyid = 'TYR'
 
-dumpfile = 'pairs-dump.pkl'
-studyset = sp.restore_studies(dumpfile)
+studyset = synapse_utils.fetch_studies(studyid)
 studylist = studyset['Studies']
-studyid = studyset['StudyID']
 study_types = studytypes(studylist)
-
 
 # Get the entity list of studies.....
 #study_entities = synapse_utils.get_synapse_studies(studyid)
@@ -46,3 +41,9 @@ study_types = studytypes(studylist)
 archive = synapse_utils.studyset_to_bag(studyset, destdir, protocol_types, bag_metadata)
 
 print('Dumped studies')
+
+#syn_pair_radii = (4, 300.0,) # maximum search radii
+syn_pair_radii = [4],
+syn_dx_core_ratio = None  # turn off 4D nearest-neighbor
+syn_core_max_ratio = None # turn off intensity ratio threshold
+synapse_utils.dump_studies(synapse_utils.compute_studies('TYR',syn_pair_radii), 'study-TYR.pkl')
