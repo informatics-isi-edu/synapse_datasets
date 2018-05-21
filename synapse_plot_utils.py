@@ -12,14 +12,18 @@ import subprocess
 import synapse_utils
 from synspy.analyze.pair import SynapticPairStudy, ImageGrossAlignment, transform_points
 
-from deriva.core import HatracStore, ErmrestCatalog, get_credential, DerivaPathError
+from deriva.core import HatracStore, ErmrestCatalog, ErmrestSnapshot, get_credential, DerivaPathError
 
+synapseserver = 'synapse-dev.isrd.isi.edu'
 
 def get_studies(studyid):
 
-    credential = get_credential("synapse.isrd.isi.edu")
-    ermrest_catalog = ErmrestCatalog('https', 'synapse.isrd.isi.edu', 1, credential)
-    hatrac_store = HatracStore('https', 'synapse.isrd.isi.edu', credentials=credential)
+    credential = get_credential(synapseserver)
+    if '@' in studyid:
+        ermrest_catalog = ErmrestSnapshot('https', synapseserver, 1, credential)
+    else:
+        ermrest_catalog = ErmrestCatalog('https', synapseserver, 1, credential)
+    hatrac_store = HatracStore('https', synapseserver, credentials=credential)
 
     githash = git_version()
     ermrest_snapshot = catalog_snapshot()
@@ -104,9 +108,9 @@ def group_studies(studies, group='Type'):
 def compute_pairs(studylist, radii, ratio=None, maxratio=None):
     print('Finding pairs for {0} studies'.format(len(studylist)))
 
-    credential = get_credential("synapse.isrd.isi.edu")
-    ermrest_catalog = ErmrestCatalog('https', 'synapse.isrd.isi.edu', 1, credential)
-    hatrac_store = HatracStore('https', 'synapse.isrd.isi.edu', credentials=credential)
+    credential = get_credential(synapseserver)
+    ermrest_catalog = ErmrestCatalog('https', synapseserver, 1, credential)
+    hatrac_store = HatracStore('https', synapseserver, credentials=credential)
 
     pairlist = []
     for s in studylist:
@@ -416,9 +420,8 @@ def git_version():
 
 
 def catalog_snapshot():
-        credential = get_credential("synapse.isrd.isi.edu")
-        catalog = ErmrestCatalog('https', 'synapse.isrd.isi.edu', 1, credential)
+        credential = get_credential(synapseserver)
+        catalog = ErmrestCatalog('https', synapseserver, 1, credential)
         # Get current version of catalog and construct a new URL that fully qualifies catalog with version.
         version = catalog.get('/').json()['snaptime']
         return version
-
