@@ -8,6 +8,7 @@ import pickle
 import synapse_plot_utils as sp
 from deriva.core import HatracStore, ErmrestCatalog, ErmrestSnapshot, get_credential
 from bdbag import bdbag_api as bdb
+from synspy.analyze.pair import SynapticPairStudy, ImageGrossAlignment, transform_points
 
 synapseserver = 'synapse-dev.isrd.isi.edu'
 
@@ -93,6 +94,7 @@ def copy_synapse_files(objectstore, study):
                             outfile.write(f)
         finally:
             shutil.rmtree(os.path.dirname(tmpfile))
+
 
 def studyset_to_bag(studyset, dest, protocol_types, bag_metadata=None, publish=False):
     """
@@ -276,6 +278,107 @@ def get_synapse_studies(studyset, protocols=None):
     return study_entities
 
 
+def compute_pairs(studylist, radii, ratio=None, maxratio=None):
+    print('Finding pairs for {0} studies'.format(len(studylist)))
+
+    credential = get_credential(synapseserver)
+    ermrest_catalog = ErmrestCatalog('https', synapseserver, 1, credential)
+    hatrac_store = HatracStore('https', synapseserver, credentials=credential)
+
+    pairlist = []
+    for s in studylist:
+        syn_study_id = s['Study']
+        s['Paired'] = True
+
+        print('Processing study {0}'.format(syn_study_id))
+        study = SynapticPairStudy.from_study_id(ermrest_catalog, syn_study_id)
+        try:
+            study.retrieve_data(hatrac_store)
+        except DerivaPathError:
+            print('Study {0} missing synaptic pair'.format(syn_study_id))
+            continue
+        pairlist.append(s)
+
+        # Compute the actual pairs for the given distances
+        s1_to_s2, s2_to_s1 = study.syn_pairing_maps(radii, ratio, maxratio)
+
+        # get results for different radii, store them in a dictonary of pandas
+        for i, r in enumerate(radii):
+
+            unpaired1 = study.get_unpaired(s1_to_s2[i, :], study.s1)
+            unpaired2 = study.get_unpaired(s2_to_s1[i, :], study.s2)
+            paired1, paired2 = study.get_pairs(s1_to_s2[i, :], study.s1, study.s2)
+
+            p = pd.DataFrame(unpaired1[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
+            s['UnpairedBefore'] = s.get('UnpairedBefore', dict())
+            s['UnpairedBefore'][r] = {'Data': p}
+
+            p = pd.DataFrame(unpaired2[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
+            s['UnpairedAfter'] = s.get('UnpairedAfter', dict())
+            s['UnpairedAfter'][r] = {'Data': p}
+
+            p = pd.DataFrame(paired1[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
+            s['PairedBefore'] = s.get('PairedBefore', dict())
+            s['PairedBefore'][r] = {'Data': p}
+
+            p = pd.DataFrame(paired2[:, 0:5], columns=['z', 'y', 'x', 'core', 'hollow'])
+            s['PairedAfter'] = s.get('PairedAfter', dict())
+            s['PairedAfter'][r] = {'Data': p}
+
+            # Fill in other useful values so you can use them without having the study handy
+            for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter']:
+                p = s[ptype][r]
+                p['DataType'] = ptype
+                p['Study'] = s['Study']
+                p['Radius'] = r
+                p['Type'] = s['Type']
+
+            # now compute the centroids and store as pandas.
+            for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter']:
+                p = s[ptype][r]['Data']
+                centroid = tuple([p['x'].mean(), p['y'].mean(), p['z'].mean()])
+                pc = pd.DataFrame.from_records([centroid], columns=['x', 'y', 'z'])
+                cname = ptype + 'Centroid'
+                s[cname] = s.get(cname, dict())
+                s[cname][r] = {'Data': pc}
+                p = s[cname][r]
+                p['DataType'] = cname
+                p['Study'] = s['Study']
+                p['Radius'] = r
+                p['Type'] = s['Type']
+
+            # Now compute the aligned images, if you have the tranformation matrix available.
+            if s['Aligned']:
+                image_obj = s['Alignment']
+                s['AlignmentPts'][r] = {'Data': s['StudyAlignmentPts']}
+                for ptype in ['PairedBefore', 'PairedAfter', 'UnpairedBefore', 'UnpairedAfter']:
+                    p = pd.DataFrame(transform_points(image_obj.M_canonical, s[ptype][r]['Data'].loc[:, ['x', 'y', 'z']]),
+                                     columns=['x', 'y', 'z'])
+                    p['core'] = s[ptype][r]['Data']['core']
+
+                    # Now do th aligned ....
+                    datatype = 'Aligned' + ptype
+                    s[datatype] = s.get(datatype, dict())
+                    s[datatype][r] = {'Data': p}
+                    s[datatype][r]['DataType'] = datatype
+                    s[datatype][r]['Study'] = s['Study']
+                    s[datatype][r]['Radius'] = r
+                    s[datatype][r]['Type'] = s['Type']
+
+                    # now compute the aligned centroids and store as pandas.
+                    centroid = tuple([p['x'].mean(), p['y'].mean(), p['z'].mean()])
+                    pc = pd.DataFrame.from_records([centroid], columns=['x', 'y', 'z'])
+                    pc = pd.DataFrame.from_records([centroid], columns=['x', 'y', 'z'])
+                    cname = datatype + 'Centroid'
+                    s[cname] = s.get(cname, dict())
+                    s[cname][r] = {'Data': pc}
+                    s[cname]['DataType'] = cname
+                    s[cname]['Study'] = s['Study']
+                    s[cname]['Radius'] = r
+                    s[cname]['Type'] = s['Type']
+    return pairlist
+
+
 def compute_study_pairs(studyid, syn_pair_radii):
     """
     Compute the study pairs, dump out the python structure, upload to hatrac and link in as a data file associated
@@ -313,9 +416,9 @@ def copy_cohort(studyset, description=''):
 
     # Need to use Deriva authentication agent before executing this
 
-    version = 0000
     credential = get_credential(synapseserver)
     if '@' in studyset:
+        [studyset, version] = studyset.split('@')
         catalog = ErmrestSnapshot('https', synapseserver, 1, version, credentials=credential)
     else:
         catalog = ErmrestCatalog('https', synapseserver, 1, credentials=credential).latest_snapshot()
