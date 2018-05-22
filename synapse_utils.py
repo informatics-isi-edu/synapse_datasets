@@ -65,12 +65,6 @@ def group_studies(studies, group='Type'):
 
 
 def get_synapse_studies(catalog, studyset):
-    """
-    Get the current list of synapse studys.
-    :param protocols:
-    :return:
-    """
-
     pb = catalog.getPathBuilder()
 
     # convenient name for the schema we care about.
@@ -117,6 +111,13 @@ def get_synapse_studies(catalog, studyset):
                                          Protocol=path.Protocol.ID )
 
     return study_entities
+
+def versioned_studyid(studyid):
+    credential = get_credential(synapseserver)
+    if '@' not in studyid:
+        ermrest_catalog = ErmrestCatalog('https', synapseserver, 1, credential).latest_snapshot()
+        studyid = studyid + '@' + ermrest_catalog.snaptime
+    return studyid
 
 
 def get_studies(studyid):
@@ -281,7 +282,7 @@ def studyset_to_bag(studyset, dest, protocol_types, bag_metadata=None, publish=F
 
         for study in study_list:
             # radius of four....
-            for d in ['UnpairedBefore','UnpairedAfter','PairedBefore']:
+            for d in ['UnpairedBefore', 'UnpairedAfter', 'PairedBefore']:
                 fn = 'synapse-data/' + study['Study'] + '-' + study['Type'] + '-' + d + '.csv'
                 study[d][4]['Data'].to_csv(fn)
 
@@ -498,17 +499,16 @@ def upload_studies(studyid, syn_pair_radii):
     """
     studyset = compute_studies(studyid, syn_pair_radii)
 
+    # Get a path for a temporary file to store  results
+    tmpfile = os.path.join(tempfile.mkdtemp(), 'pairs-dump.pkl')
     try:
-        # Get a path for a temporary file to store  results
-        tmpfile = os.path.join(tempfile.mkdtemp(), 'pairs-dump.pkl')
         with open(tmpfile, 'wb') as fo:
             pickle.dump(studyset, fo)
             print('dumped {0} studies to {1}'.format(len(studyset['Studies']), tmpfile))
 
         add_file_to_cohort(tmpfile, 'Python data structures with pair data for {0}'.format(studyid), studyid)
     finally:
-        pass
-  #     shutil.rmtree(os.path.dirname(tmpfile))
+        shutil.rmtree(os.path.dirname(tmpfile))
     return
 
 
@@ -527,10 +527,14 @@ def fetch_studies(studyid):
 
     credential = get_credential(synapseserver)
     if '@' in studyid:
-        catalog = ErmrestSnapshot('https', synapseserver, 1, credential)
+        [studyid, snaptime] = studyid.split('@')
+        catalog = ErmrestSnapshot('https', synapseserver, 1, snaptime, credentials=credential)
     else:
-        catalog = ErmrestCatalog('https', synapseserver, 1, credential).latest_snapshot()
+        catalog = ErmrestCatalog('https', synapseserver, 1, credentials=credential).latest_snapshot()
+        snaptime = catalog.snaptime
     hatrac = HatracStore('https', synapseserver, credentials=credential)
+
+    print('Getting {}@{}'.format(studyid, snaptime))
 
     pb = catalog.getPathBuilder()
     zebrafish = pb.Zebrafish
@@ -554,7 +558,7 @@ def fetch_studies(studyid):
         with open(tmpfile, 'rb') as fo:
             slist = pickle.load(fo)
     finally:
-          shutil.rmtree(os.path.dirname(tmpfile))
+        shutil.rmtree(os.path.dirname(tmpfile))
 
     print('Restored {0} studies'.format(len(slist['Studies'])))
     return slist

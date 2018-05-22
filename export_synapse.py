@@ -28,7 +28,7 @@ study_types = studytypes(studylist)
 #print('Identified %d studies' % len(study_entities))
 
 # This is a hack until we get get right version support in PathBuilder
-#ermrest_version = vc.current_catalog_version(
+ermrest_version = vc.current_catalog_version(
 #    ErmrestCatalog('https', 'synapse.isrd.isi.edu', 1,
 #                   get_credential('synapse.isrd.isi.edu')))
 
@@ -43,7 +43,7 @@ archive = synapse_utils.studyset_to_bag(studyset, destdir, protocol_types, bag_m
 print('Dumped studies')
 
 #syn_pair_radii = (4, 300.0,) # maximum search radii
-syn_pair_radii = [4],
+syn_pair_radii = [4]
 syn_dx_core_ratio = None  # turn off 4D nearest-neighbor
 syn_core_max_ratio = None # turn off intensity ratio threshold
 synapse_utils.dump_studies(synapse_utils.compute_studies('TYR',syn_pair_radii), 'study-TYR.pkl')
