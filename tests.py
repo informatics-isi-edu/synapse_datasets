@@ -10,7 +10,7 @@ from sklearn.datasets import make_blobs
 import hdbscan
 
 
-dumpfile = 'pairs-dump.pkl'
+dumpfile = 'study-10DJ.pkl'
 studyset = sp.restore_studies(dumpfile)
 studylist = studyset['Studies']
 synapses, syn_max, syn_min = sp.aggregate_studies(studylist)
@@ -61,9 +61,9 @@ def construct_test_pair0(study,type, datatype):
              'DataType': datatype,
              'Type' : type,
              'Data' : pd.DataFrame(
-                 {'x': [1,1,1,4,4,4,1,1,1,4,4,4],
-                  'z': [1,4,5,1,4,5,1,4,5,1,4,5],
-                  'y': [1,1,1,1,1,1,4,4,4,4,4,4]
+                 {'x': [1, 1, 1, 4, 4, 4, 1, 1, 1, 4, 4, 4],
+                  'y': [1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4],
+                  'z': [1, 4, 5, 1, 4, 5, 1, 4, 5, 1, 4, 5],
                   }
              )
          }
@@ -87,6 +87,6 @@ l = [ construct_test_study('foo','learner'), construct_test_study('bar','learner
 a = sp.aggregate_studies(l)
 c = sp.bin_synapses(l,4)
 d = sp.synapse_density(c)
-d = sp.synapse_density3d(c)
+e = sp.synapse_density3d(c)
 
 

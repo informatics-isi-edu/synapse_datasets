@@ -145,6 +145,7 @@ def synapse_density(binned_synapses, axis='y', mode='density', threshold=0):
 
         for k in centermass_0.data_vars:
             density[t][k].attrs['center_of_mass'] = (float(centermass_0[k]), float(centermass_1[k]))
+            print('2d COM:', t, k, density[t][k].attrs['center_of_mass'])
     return density
 
 
@@ -182,7 +183,6 @@ def synapse_density3d(binned_synapses, threshold=0):
         for k in centermass_x.data_vars:
             density[t][k].attrs['center_of_mass'] = \
                 (float(centermass_x[k]), float(centermass_y[k]), float(centermass_z[k]))
-            print(t, k, density[t][k].attrs['center_of_mass'])
     return density
 
 

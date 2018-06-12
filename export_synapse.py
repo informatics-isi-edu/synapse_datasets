@@ -17,8 +17,7 @@ bag_metadata = {
     'External-Description': 'Synapse Pair Datasets',
 }
 
-studyid = 'TYR'
-
+studyid = '10DJ@2PS-H8ZM-3F2G'
 studyset = synapse_utils.fetch_studies(studyid)
 studylist = studyset['Studies']
 study_types = studytypes(studylist)
