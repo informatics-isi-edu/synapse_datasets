@@ -17,6 +17,126 @@ bag_metadata = {
     'External-Description': 'Synapse Pair Datasets',
 }
 
+
+def studyset_to_bag(studyset, dest, protocol_types, bag_metadata=None, publish=False):
+    """
+    Export all of the synapse data for every study in the study list.
+    Also output a CVS file that contains an index of all of the data.
+
+    The data indes is: StudyID, SubjectID, Study Type, FileNames for Before and After synapses.
+
+    """
+
+    bag_metadata = bag_metadata if bag_metadata else {}
+
+    study_list = studyset['Studies']
+
+    current_dir = os.getcwd()
+    try:
+        os.chdir(dest)
+
+        # Create an output directory for synapse files.
+        os.makedirs('synapse-studies', mode=0o777, exist_ok=True)
+        os.chdir('synapse-studies')
+
+        dumpdir = os.getcwd()
+
+        os.makedirs('synapse-data', mode=0o777, exist_ok=True)
+
+        for study in study_list:
+            # radius of four....
+            for d in ['UnpairedBefore', 'UnpairedAfter', 'PairedBefore']:
+                fn = 'synapse-data/' + study['Study'] + '-' + study['Type'] + '-' + d + '.csv'
+                study[d][4]['Data'].to_csv(fn)
+
+        # Now write out the CSV file will the list of studies...
+        with open('studies.csv', 'w', newline='') as csvfile:
+            synapsewriter = csv.writer(csvfile)
+
+            # Write out header....
+            synapsewriter.writerow(['Study', 'Subject', 'Type'])
+            for study in study_list:
+                url1 = study['BeforeURL']
+                url2 = study['AfterURL']
+
+                filename1 = filename2 = ''
+                if url1:
+                    filename1 = (os.path.basename(url1.split(':')[0]))
+                if url2:
+                    filename2 = (os.path.basename(url2.split(':')[0]))
+
+                synapsewriter.writerow([study['Study'], study['Subject'], study['Type']])
+
+        bdb.make_bag(dumpdir, metadata=bag_metadata)
+        archivefile = bdb.archive_bag(dumpdir, 'zip')
+
+        if publish:
+            bagstore = HatracStore('https', 'synapse-dev.isrd.isi.edu', credentials=credential)
+            hatrac_path = '/hatrac/Data/synapse-{0}'.format(bag_metadata['ERMRest-Snapshot'])
+            return bagstore.put_obj(hatrac_path, archivefile)
+    finally:
+        os.chdir(current_dir)
+    return archivefile
+
+
+def synapses_to_bag(study_list, dest, protocol_types, bag_metadata=None, publish=False):
+    """
+    Export all of the synapse data for every study in the study list.
+    Also output a CVS file that contains an index of all of the data.
+
+    The data indes is: StudyID, SubjectID, Study Type, FileNames for Before and After synapses.
+
+    """
+
+    bag_metadata = bag_metadata if bag_metadata else {}
+
+    credential = get_credential("synapse.isrd.isi.edu")
+    objectstore = HatracStore('https', 'synapse.isrd.isi.edu', credentials=credential)
+
+    current_dir = os.getcwd()
+    try:
+        os.chdir(dest)
+
+        # Create an output directory for synapse files.
+        os.makedirs('synapse-studies', mode=0o777, exist_ok=True)
+        os.chdir('synapse-studies')
+        dumpdir = os.getcwd()
+
+        for study in study_list:
+            copy_synapse_files(objectstore, study)
+
+        # Now write out the CSV file will the list of studies...
+        with open('studies.csv', 'w', newline='') as csvfile:
+            synapsewriter = csv.writer(csvfile)
+
+            # Write out header....
+            synapsewriter.writerow(['Study', 'Subject', 'Type', 'Learner', 'Before', 'After'])
+            for study in study_list:
+                study_type = protocol_types[study['Protocol']]
+                url1 = study['BeforeURL']
+                url2 = study['AfterURL']
+
+                filename1 = filename2 = ''
+                if url1:
+                    filename1 = (os.path.basename(url1.split(':')[0]))
+                if url2:
+                    filename2 = (os.path.basename(url2.split(':')[0]))
+
+                synapsewriter.writerow([study['Study'], study['Subject'], study_type, study['Learner'],
+                                        filename1, filename2])
+
+        bdb.make_bag(dumpdir, metadata=bag_metadata)
+        archivefile = bdb.archive_bag(dumpdir, 'zip')
+
+        if publish:
+            bagstore = HatracStore('https', 'synapse-dev.isrd.isi.edu', credentials=credential)
+            hatrac_path = '/hatrac/Data/synapse-{0}'.format(bag_metadata['ERMRest-Snapshot'])
+            return bagstore.put_obj(hatrac_path, archivefile)
+    finally:
+        os.chdir(current_dir)
+    return archivefile
+
+
 studyid = '10DJ@2PS-H8ZM-3F2G'
 studyset = synapse_utils.fetch_studies(studyid)
 studylist = studyset['Studies']
