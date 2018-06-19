@@ -299,7 +299,7 @@ def plot_synapses(studylist,
                   centroid=False,
                   skipall=False):
     # Change this if you want the point sizes in the plots to be different
-    pt_size = 4
+    pt_size = 1
 
     plotmode = plotmode.lower()
     # Use the smallest available radius as the default if one is not provided.
